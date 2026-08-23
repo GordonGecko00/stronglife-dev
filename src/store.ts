@@ -26,10 +26,19 @@ export function getData(): AppData {
   return data;
 }
 
-/** Apply an update to the app data and persist + notify subscribers. */
+/**
+ * Apply an update to the app data and persist + notify subscribers.
+ *
+ * The mutator runs against a clone rather than the live object so that every
+ * update publishes a fresh top-level reference. `useSyncExternalStore` compares
+ * snapshots with `Object.is`, so mutating in place would leave subscribers
+ * showing stale values (a controlled input would snap back to its old value
+ * even though the new one had been saved).
+ */
 export function update(fn: (draft: AppData) => AppData | void): void {
-  const result = fn(data);
-  data = result ?? data;
+  const draft = structuredClone(data);
+  const result = fn(draft);
+  data = result ?? draft;
   persist();
 }
 
