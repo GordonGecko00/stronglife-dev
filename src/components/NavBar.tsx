@@ -2,10 +2,10 @@ import { NavLink } from "react-router-dom";
 
 const TABS = [
   { to: "/", label: "Today", end: true },
-  { to: "/plan", label: "Plan", end: false },
+  { to: "/week", label: "Week", end: false },
   { to: "/progress", label: "Progress", end: false },
   { to: "/history", label: "History", end: false },
-  { to: "/settings", label: "More", end: false },
+  { to: "/more", label: "More", end: false },
 ];
 
 export default function NavBar() {

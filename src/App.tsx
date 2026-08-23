@@ -3,10 +3,13 @@ import { HashRouter, Routes, Route, Outlet } from "react-router-dom";
 import NavBar from "./components/NavBar";
 import RestBar from "./components/RestBar";
 import Today from "./pages/Today";
-import Plan from "./pages/Plan";
+import Week from "./pages/Week";
+import Program from "./pages/Program";
 import Progress from "./pages/Progress";
 import History from "./pages/History";
 import Settings from "./pages/Settings";
+import Milestones from "./pages/Milestones";
+import More from "./pages/More";
 import Session from "./pages/Session";
 import { useAppData } from "./store/store";
 
@@ -40,9 +43,12 @@ export default function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Today />} />
-          <Route path="/plan" element={<Plan />} />
+          <Route path="/week" element={<Week />} />
+          <Route path="/program" element={<Program />} />
           <Route path="/progress" element={<Progress />} />
           <Route path="/history" element={<History />} />
+          <Route path="/more" element={<More />} />
+          <Route path="/milestones" element={<Milestones />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
         <Route element={<Layout withNav={false} />}>

@@ -1,8 +1,10 @@
 import type {
   AppData,
   BodyWeightEntry,
+  DailyLog,
   Exercise,
   ExerciseLog,
+  Habit,
   SetLog,
   Settings,
   Unit,
@@ -20,30 +22,37 @@ import { convertRounded, DEFAULT_BAR, DEFAULT_PLATES } from "../lib/units";
 function buildExerciseLog(exercise: Exercise, settings: Settings): ExerciseLog {
   const sets: SetLog[] = [];
 
-  if (settings.warmupEnabled && exercise.useWarmup && exercise.usesBar) {
-    for (const w of warmupSets(exercise.weight, settings.barWeight, settings.plates)) {
-      sets.push({ kind: "warmup", targetReps: w.reps, weight: w.weight, reps: null, done: false });
+  if (exercise.tracking === "reps") {
+    if (settings.warmupEnabled && exercise.useWarmup && exercise.usesBar) {
+      for (const w of warmupSets(exercise.weight, settings.barWeight, settings.plates)) {
+        sets.push({ kind: "warmup", targetReps: w.reps, weight: w.weight, reps: null, done: false });
+      }
     }
-  }
-
-  for (let i = 0; i < exercise.sets; i++) {
-    sets.push({
-      kind: "work",
-      targetReps: exercise.targetReps,
-      weight: exercise.weight,
-      reps: null,
-      done: false,
-    });
+    for (let i = 0; i < exercise.sets; i++) {
+      sets.push({
+        kind: "work",
+        targetReps: exercise.targetReps,
+        weight: exercise.weight,
+        reps: null,
+        done: false,
+      });
+    }
   }
 
   return {
     exerciseId: exercise.id,
     name: exercise.name,
+    tracking: exercise.tracking,
     targetReps: exercise.targetReps,
+    targetRepsMax: exercise.targetRepsMax,
     weight: exercise.weight,
     increment: exercise.increment,
     usesBar: exercise.usesBar,
     sets,
+    minutes: null,
+    targetMinutes: exercise.targetMinutes,
+    completed: false,
+    hint: exercise.hint,
     note: "",
   };
 }
@@ -55,11 +64,13 @@ export function startSession(template: WorkoutTemplate): string {
       id,
       templateId: template.id,
       templateName: template.name,
+      kind: template.kind,
       dateISO: new Date().toISOString(),
       startedAt: Date.now(),
       finishedAt: null,
       unit: d.settings.unit,
       note: "",
+      effort: null,
       exercises: template.exercises.map((e) => buildExerciseLog(e, d.settings)),
     };
     d.sessions.unshift(session);
@@ -67,6 +78,31 @@ export function startSession(template: WorkoutTemplate): string {
     d.restEndsAt = null;
   });
   return id;
+}
+
+/** Log a finished session in one go, for things like hockey you don't run a timer for. */
+export function quickLogSession(template: WorkoutTemplate, minutes: number, when = new Date()): void {
+  update((d) => {
+    const exercises = template.exercises.map((e) => {
+      const log = buildExerciseLog(e, d.settings);
+      if (log.tracking === "duration") log.minutes = minutes;
+      if (log.tracking === "done") log.completed = true;
+      return log;
+    });
+    d.sessions.unshift({
+      id: uid(),
+      templateId: template.id,
+      templateName: template.name,
+      kind: template.kind,
+      dateISO: when.toISOString(),
+      startedAt: when.getTime() - minutes * 60_000,
+      finishedAt: when.getTime(),
+      unit: d.settings.unit,
+      note: "",
+      effort: null,
+      exercises,
+    });
+  });
 }
 
 export function getActiveSession(d: AppData): WorkoutSession | null {
@@ -121,6 +157,35 @@ export function setExerciseNote(sessionId: string, exerciseIndex: number, note: 
   update((d) => {
     const log = withSession(d, sessionId)?.exercises[exerciseIndex];
     if (log) log.note = note;
+  });
+}
+
+/** `duration` exercises: minutes actually done. */
+export function setExerciseMinutes(
+  sessionId: string,
+  exerciseIndex: number,
+  minutes: number | null
+): void {
+  update((d) => {
+    const log = withSession(d, sessionId)?.exercises[exerciseIndex];
+    if (!log) return;
+    log.minutes = minutes === null ? null : Math.max(0, minutes);
+  });
+}
+
+/** `done` exercises: a plain tick. */
+export function toggleExerciseComplete(sessionId: string, exerciseIndex: number): void {
+  update((d) => {
+    const log = withSession(d, sessionId)?.exercises[exerciseIndex];
+    if (!log) return;
+    log.completed = !log.completed;
+  });
+}
+
+export function setSessionEffort(sessionId: string, effort: number | null): void {
+  update((d) => {
+    const session = withSession(d, sessionId);
+    if (session) session.effort = effort;
   });
 }
 
@@ -207,7 +272,13 @@ export function notifyRestFinished(enabled: boolean): void {
 export function addTemplate(): string {
   const id = uid();
   update((d) => {
-    d.templates.push({ id, name: `Workout ${d.templates.length + 1}`, exercises: [] });
+    d.templates.push({
+      id,
+      name: `Workout ${d.templates.length + 1}`,
+      kind: "strength",
+      slot: "am",
+      exercises: [],
+    });
     if (!d.schedule.rotation.includes(id)) d.schedule.rotation.push(id);
   });
   return id;
@@ -225,6 +296,10 @@ export function deleteTemplate(templateId: string): void {
     d.templates = d.templates.filter((t) => t.id !== templateId);
     for (let day = 0; day < 7; day++) {
       if (d.schedule.days[day] === templateId) d.schedule.days[day] = null;
+      if (d.schedule.eveningDays[day] === templateId) d.schedule.eveningDays[day] = null;
+    }
+    if (d.settings.recovery.recoveryTemplateId === templateId) {
+      d.settings.recovery.recoveryTemplateId = null;
     }
     d.schedule.rotation = d.schedule.rotation.filter((id) => id !== templateId);
     if (d.schedule.rotationIndex >= d.schedule.rotation.length) d.schedule.rotationIndex = 0;
@@ -236,6 +311,7 @@ export function duplicateTemplate(templateId: string): void {
     const source = d.templates.find((t) => t.id === templateId);
     if (!source) return;
     d.templates.push({
+      ...source,
       id: uid(),
       name: `${source.name} copy`,
       exercises: source.exercises.map((e) => ({ ...e, id: uid() })),
@@ -250,13 +326,17 @@ export function addExercise(templateId: string): void {
     t.exercises.push({
       id: uid(),
       name: "New exercise",
-      sets: 5,
-      targetReps: 5,
+      tracking: "reps",
+      sets: 3,
+      targetReps: 8,
+      targetRepsMax: 10,
       weight: d.settings.barWeight,
       increment: d.settings.unit === "kg" ? 2.5 : 5,
       consecutiveFails: 0,
       usesBar: true,
       useWarmup: true,
+      targetMinutes: 0,
+      hint: "",
     });
   });
 }
@@ -374,5 +454,111 @@ export function setUnit(unit: Unit): void {
     d.settings.unit = unit;
     d.settings.barWeight = DEFAULT_BAR[unit];
     d.settings.plates = [...DEFAULT_PLATES[unit]];
+  });
+}
+
+/* ------------------------------------------------------------ daily check-in */
+
+function ensureDay(d: AppData, key: string): DailyLog {
+  if (!d.dailyLogs[key]) {
+    d.dailyLogs[key] = { dayKey: key, proteinGrams: 0, waterGlasses: 0, habits: {}, journal: "" };
+  }
+  return d.dailyLogs[key];
+}
+
+export function patchDailyLog(key: string, fields: Partial<Omit<DailyLog, "dayKey">>): void {
+  update((d) => {
+    Object.assign(ensureDay(d, key), fields);
+  });
+}
+
+export function toggleHabit(key: string, habitId: string): void {
+  update((d) => {
+    const log = ensureDay(d, key);
+    log.habits[habitId] = !log.habits[habitId];
+  });
+}
+
+export function bumpWater(key: string, delta: number): void {
+  update((d) => {
+    const log = ensureDay(d, key);
+    log.waterGlasses = Math.max(0, log.waterGlasses + delta);
+  });
+}
+
+export function bumpProtein(key: string, delta: number): void {
+  update((d) => {
+    const log = ensureDay(d, key);
+    log.proteinGrams = Math.max(0, log.proteinGrams + delta);
+  });
+}
+
+/* ----------------------------------------------------------------- habits */
+
+export function addHabit(name: string, group: Habit["group"], cadence: Habit["cadence"]): void {
+  update((d) => {
+    d.habits.push({
+      id: uid(),
+      name,
+      group,
+      cadence,
+      weeklyTarget: cadence === "daily" ? 7 : 2,
+      archived: false,
+    });
+  });
+}
+
+export function patchHabit(habitId: string, fields: Partial<Habit>): void {
+  update((d) => {
+    const habit = d.habits.find((h) => h.id === habitId);
+    if (habit) Object.assign(habit, fields);
+  });
+}
+
+export function removeHabit(habitId: string): void {
+  update((d) => {
+    d.habits = d.habits.filter((h) => h.id !== habitId);
+  });
+}
+
+/* -------------------------------------------------------------- milestones */
+
+export function toggleMilestone(id: string): void {
+  update((d) => {
+    const milestone = d.milestones.find((m) => m.id === id);
+    if (milestone) milestone.done = !milestone.done;
+  });
+}
+
+export function addMilestone(month: number, title: string): void {
+  update((d) => {
+    d.milestones.push({ id: uid(), month, title, done: false });
+  });
+}
+
+export function removeMilestone(id: string): void {
+  update((d) => {
+    d.milestones = d.milestones.filter((m) => m.id !== id);
+  });
+}
+
+/* ------------------------------------------------------- evening schedule */
+
+export function setEveningDay(day: number, templateId: string | null): void {
+  update((d) => {
+    d.schedule.eveningDays[day] = templateId;
+  });
+}
+
+export function patchRecoveryRule(fields: Partial<AppData["settings"]["recovery"]>): void {
+  update((d) => {
+    Object.assign(d.settings.recovery, fields);
+  });
+}
+
+export function patchTemplate(templateId: string, fields: Partial<WorkoutTemplate>): void {
+  update((d) => {
+    const template = d.templates.find((t) => t.id === templateId);
+    if (template) Object.assign(template, fields);
   });
 }

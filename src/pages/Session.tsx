@@ -6,6 +6,9 @@ import {
   setReps,
   adjustSessionWeight,
   setExerciseNote,
+  setExerciseMinutes,
+  toggleExerciseComplete,
+  setSessionEffort,
   setSessionNote,
   finishSession,
   cancelSession,
@@ -40,9 +43,12 @@ export default function Session() {
 
   if (!session) return null;
 
-  const workSets = session.exercises.flatMap((e) => e.sets.filter((s) => s.kind === "work"));
-  const loggedCount = workSets.filter((s) => s.done).length;
-  const allLogged = loggedCount === workSets.length && workSets.length > 0;
+  // Count every trackable item, so a cardio or yoga session can reach 100% too.
+  const items = session.exercises.flatMap((ex) =>
+    ex.tracking === "reps" ? ex.sets.filter((s) => s.kind === "work").map((s) => s.done) : [logDone(ex)]
+  );
+  const loggedCount = items.filter(Boolean).length;
+  const allLogged = loggedCount === items.length && items.length > 0;
 
   return (
     <div className="page session-page">
@@ -67,17 +73,35 @@ export default function Session() {
       <div className="progress-track" aria-hidden="true">
         <div
           className="progress-fill"
-          style={{ width: `${workSets.length ? (loggedCount / workSets.length) * 100 : 0}%` }}
+          style={{ width: `${items.length ? (loggedCount / items.length) * 100 : 0}%` }}
         />
       </div>
       <p className="muted">
-        {loggedCount} of {workSets.length} work sets logged · tap a set to log, long-press for other
-        rep counts
+        {loggedCount} of {items.length} logged
+        {session.exercises.some((e) => e.tracking === "reps") &&
+          " · tap a set to log, long-press for other rep counts"}
       </p>
 
       {session.exercises.map((log, index) => (
         <ExerciseCard key={log.exerciseId} sessionId={session.id} log={log} index={index} />
       ))}
+
+      <div className="field">
+        <span>How did it feel?</span>
+        <div className="effort-row">
+          {[1, 2, 3, 4, 5].map((level) => (
+            <button
+              key={level}
+              className={`effort ${session.effort === level ? "effort-on" : ""}`}
+              aria-pressed={session.effort === level}
+              onClick={() => setSessionEffort(session.id, session.effort === level ? null : level)}
+            >
+              {level}
+            </button>
+          ))}
+          <span className="muted effort-hint">1 easy · 5 all-out</span>
+        </div>
+      </div>
 
       <label className="field">
         <span>Workout notes</span>
@@ -105,6 +129,13 @@ export default function Session() {
   );
 }
 
+/** A timed or tick-box exercise counts as logged once it has a value. */
+function logDone(log: ExerciseLog): boolean {
+  if (log.tracking === "duration") return log.minutes !== null;
+  if (log.tracking === "done") return log.completed;
+  return log.sets.filter((s) => s.kind === "work").every((s) => s.done);
+}
+
 function ExerciseCard({
   sessionId,
   log,
@@ -117,7 +148,55 @@ function ExerciseCard({
   const data = useAppData();
   const [showNote, setShowNote] = useState(log.note.length > 0);
   const { unit, barWeight, plates } = data.settings;
+  const complete = hitAllTargets(log);
 
+  return (
+    <div className={`card exercise-card ${complete ? "exercise-done" : ""}`}>
+      <div className="card-head">
+        <h2>{log.name}</h2>
+        {complete && <span className="badge badge-hit">Done</span>}
+      </div>
+      {log.hint && <p className="muted">{log.hint}</p>}
+
+      {log.tracking === "reps" && (
+        <RepsBody sessionId={sessionId} log={log} index={index} unit={unit} bar={barWeight} plates={plates} />
+      )}
+      {log.tracking === "duration" && <DurationBody sessionId={sessionId} log={log} index={index} />}
+      {log.tracking === "done" && <DoneBody sessionId={sessionId} log={log} index={index} />}
+
+      {showNote ? (
+        <label className="field">
+          <span>Note</span>
+          <input
+            value={log.note}
+            placeholder="Form cue, pain, how it felt…"
+            onChange={(event) => setExerciseNote(sessionId, index, event.target.value)}
+          />
+        </label>
+      ) : (
+        <button className="btn-link" onClick={() => setShowNote(true)}>
+          + Add note
+        </button>
+      )}
+    </div>
+  );
+}
+
+function RepsBody({
+  sessionId,
+  log,
+  index,
+  unit,
+  bar,
+  plates,
+}: {
+  sessionId: string;
+  log: ExerciseLog;
+  index: number;
+  unit: "lb" | "kg";
+  bar: number;
+  plates: number[];
+}) {
   const step = unit === "kg" ? 2.5 : 5;
   const warmups = log.sets
     .map((set, setIndex) => ({ set, setIndex }))
@@ -125,15 +204,10 @@ function ExerciseCard({
   const work = log.sets
     .map((set, setIndex) => ({ set, setIndex }))
     .filter(({ set }) => set.kind === "work");
-  const complete = hitAllTargets(log);
+  const range = log.targetRepsMax > log.targetReps ? `${log.targetReps}–${log.targetRepsMax}` : `${log.targetReps}`;
 
   return (
-    <div className={`card exercise-card ${complete ? "exercise-done" : ""}`}>
-      <div className="card-head">
-        <h2>{log.name}</h2>
-        {complete && <span className="badge badge-hit">All reps</span>}
-      </div>
-
+    <>
       <div className="weight-row">
         <button
           className="step-btn"
@@ -155,9 +229,7 @@ function ExerciseCard({
         </button>
       </div>
 
-      {log.usesBar && (
-        <PlateChips weight={log.weight} bar={barWeight} plates={plates} unit={unit} />
-      )}
+      {log.usesBar && <PlateChips weight={log.weight} bar={bar} plates={plates} unit={unit} />}
 
       {warmups.length > 0 && (
         <div className="set-group">
@@ -179,7 +251,7 @@ function ExerciseCard({
 
       <div className="set-group">
         <span className="set-group-label">
-          Work · {log.sets.filter((s) => s.kind === "work").length}×{log.targetReps}
+          Work · {work.length}×{range}
         </span>
         <div className="set-grid">
           {work.map(({ set, setIndex }) => (
@@ -187,26 +259,78 @@ function ExerciseCard({
               key={setIndex}
               set={set}
               index={setIndex}
+              topOfRange={log.targetRepsMax}
               onChange={(reps) => setReps(sessionId, index, setIndex, reps)}
             />
           ))}
         </div>
       </div>
+    </>
+  );
+}
 
-      {showNote ? (
-        <label className="field">
-          <span>Note</span>
-          <input
-            value={log.note}
-            placeholder="Form cue, pain, bar speed…"
-            onChange={(event) => setExerciseNote(sessionId, index, event.target.value)}
-          />
-        </label>
-      ) : (
-        <button className="btn-link" onClick={() => setShowNote(true)}>
-          + Add note
+function DurationBody({
+  sessionId,
+  log,
+  index,
+}: {
+  sessionId: string;
+  log: ExerciseLog;
+  index: number;
+}) {
+  const value = log.minutes ?? log.targetMinutes;
+
+  return (
+    <div className="duration-body">
+      <div className="weight-row">
+        <button
+          className="step-btn"
+          aria-label={`Less time on ${log.name}`}
+          onClick={() => setExerciseMinutes(sessionId, index, Math.max(0, value - 5))}
+        >
+          −
         </button>
-      )}
+        <span className="weight-value">
+          {value}
+          <span className="weight-unit">min</span>
+        </span>
+        <button
+          className="step-btn"
+          aria-label={`More time on ${log.name}`}
+          onClick={() => setExerciseMinutes(sessionId, index, value + 5)}
+        >
+          +
+        </button>
+      </div>
+      <p className="muted">Target {log.targetMinutes} min</p>
+      <button
+        className={`btn ${log.minutes === null ? "btn-ghost" : "btn-primary"}`}
+        onClick={() =>
+          setExerciseMinutes(sessionId, index, log.minutes === null ? value : null)
+        }
+      >
+        {log.minutes === null ? `Log ${value} min` : `Logged ${log.minutes} min — tap to clear`}
+      </button>
     </div>
+  );
+}
+
+function DoneBody({
+  sessionId,
+  log,
+  index,
+}: {
+  sessionId: string;
+  log: ExerciseLog;
+  index: number;
+}) {
+  return (
+    <button
+      className={`btn ${log.completed ? "btn-primary" : "btn-ghost"}`}
+      aria-pressed={log.completed}
+      onClick={() => toggleExerciseComplete(sessionId, index)}
+    >
+      {log.completed ? "✓ Done" : "Mark done"}
+    </button>
   );
 }

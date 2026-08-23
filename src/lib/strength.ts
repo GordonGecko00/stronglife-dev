@@ -9,24 +9,40 @@ export function estimateOneRepMax(weight: number, reps: number): number {
   return weight * (1 + reps / 30);
 }
 
-/** Did every work set hit its target? Warmups never count against you. */
+function workSets(log: ExerciseLog) {
+  return log.sets.filter((s) => s.kind === "work");
+}
+
+/** Every work set reached the bottom of the rep range. */
 export function hitAllTargets(log: ExerciseLog): boolean {
-  const workSets = log.sets.filter((s) => s.kind === "work");
-  if (workSets.length === 0) return false;
-  return workSets.every((s) => s.done && (s.reps ?? 0) >= s.targetReps);
+  if (log.tracking === "done") return log.completed;
+  if (log.tracking === "duration") return (log.minutes ?? 0) >= log.targetMinutes;
+  const sets = workSets(log);
+  if (sets.length === 0) return false;
+  return sets.every((s) => s.done && (s.reps ?? 0) >= s.targetReps);
+}
+
+/** Every work set reached the TOP of the range — the cue to add weight. */
+export function hitTopOfRange(log: ExerciseLog): boolean {
+  if (log.tracking !== "reps") return hitAllTargets(log);
+  const sets = workSets(log);
+  if (sets.length === 0) return false;
+  const top = Math.max(log.targetRepsMax, log.targetReps);
+  return sets.every((s) => s.done && (s.reps ?? 0) >= top);
 }
 
 export interface ProgressionResult {
   weight: number;
   consecutiveFails: number;
-  /** What happened, for the post-workout summary. */
-  outcome: "increase" | "deload" | "repeat";
+  outcome: "increase" | "hold" | "deload" | "repeat";
 }
 
 /**
- * Linear progression: hit every rep and the weight goes up next time. Miss, and
- * it stays put until `deloadAfterFails` sessions in a row have missed, at which
- * point it drops back to build momentum again.
+ * Double progression.
+ *
+ * Work up through the rep range at a fixed weight; once every set hits the top
+ * of the range, add weight and start again from the bottom. A range of 5–5 (a
+ * classic 5x5) collapses to plain linear progression.
  */
 export function applyProgression(
   currentWeight: number,
@@ -35,14 +51,24 @@ export function applyProgression(
   log: ExerciseLog,
   settings: Settings
 ): ProgressionResult {
+  // Timed and tick-box work carries no load, so there is nothing to progress.
+  if (log.tracking !== "reps") {
+    return { weight: currentWeight, consecutiveFails: 0, outcome: "hold" };
+  }
+
   const step = SMALLEST_STEP[settings.unit];
 
-  if (hitAllTargets(log)) {
+  if (hitTopOfRange(log)) {
     return {
       weight: roundTo(currentWeight + increment, step),
       consecutiveFails: 0,
       outcome: "increase",
     };
+  }
+
+  // Inside the range: same weight next time, chase more reps.
+  if (hitAllTargets(log)) {
+    return { weight: currentWeight, consecutiveFails: 0, outcome: "hold" };
   }
 
   const fails = consecutiveFails + 1;
@@ -51,8 +77,9 @@ export function applyProgression(
     const deloaded = log.usesBar
       ? nearestLoadable(target, settings.barWeight, settings.plates)
       : roundTo(target, step);
+    const floor = log.usesBar ? settings.barWeight : 0;
     return {
-      weight: Math.max(deloaded, log.usesBar ? settings.barWeight : step),
+      weight: Math.max(deloaded, floor),
       consecutiveFails: 0,
       outcome: "deload",
     };
@@ -65,9 +92,15 @@ export function applyProgression(
 export function sessionVolume(exercises: ExerciseLog[]): number {
   let total = 0;
   for (const ex of exercises) {
+    if (ex.tracking !== "reps") continue;
     for (const set of ex.sets) {
       if (set.kind === "work" && set.done) total += set.weight * (set.reps ?? 0);
     }
   }
   return total;
+}
+
+/** Minutes of conditioning / recovery / sport work in a session. */
+export function sessionMinutes(exercises: ExerciseLog[]): number {
+  return exercises.reduce((total, ex) => total + (ex.minutes ?? 0), 0);
 }

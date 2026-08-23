@@ -1,7 +1,7 @@
-import type { AppData, Unit, WorkoutSession, WorkoutTemplate } from "../types";
+import type { AppData, DailyLog, Habit, Unit, WorkoutSession, WorkoutTemplate } from "../types";
 import { estimateOneRepMax, sessionVolume } from "../lib/strength";
 import { convert } from "../lib/units";
-import { dayKey, exerciseKey, startOfDay } from "../lib/misc";
+import { addDays, dayKey, exerciseKey, startOfDay } from "../lib/misc";
 
 export function completedSessions(d: AppData): WorkoutSession[] {
   return d.sessions.filter((s) => s.finishedAt !== null);
@@ -190,4 +190,65 @@ export function bodyWeightSeries(d: AppData, unit: Unit): SeriesPoint[] {
 /** Day keys that have a completed workout, for the calendar. */
 export function workoutDayKeys(d: AppData): Set<string> {
   return new Set(completedSessions(d).map((s) => dayKey(s.finishedAt ?? s.dateISO)));
+}
+
+/* ------------------------------------------------------ daily check-in */
+
+export function dayLog(d: AppData, key: string): DailyLog {
+  return d.dailyLogs[key] ?? { dayKey: key, proteinGrams: 0, waterGlasses: 0, habits: {}, journal: "" };
+}
+
+/**
+ * Daily protein goal from the most recent body weight, converted into the
+ * current unit. Returns null until a body weight has been logged.
+ */
+export function proteinTarget(d: AppData): number | null {
+  const latest = d.bodyWeights[0];
+  if (!latest) return null;
+  const weight = convert(latest.weight, latest.unit, d.settings.unit);
+  return Math.round(weight * d.settings.proteinPerUnit);
+}
+
+export interface HabitProgress {
+  habit: Habit;
+  /** Days completed within the current week. */
+  count: number;
+  target: number;
+  doneToday: boolean;
+}
+
+/** Habit completion for the Monday-to-Sunday week containing `from`. */
+export function habitProgress(d: AppData, from = new Date()): HabitProgress[] {
+  const monday = startOfDay(from);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  const weekKeys = Array.from({ length: 7 }, (_, i) => dayKey(addDays(monday, i)));
+  const todayKey = dayKey(from);
+
+  return d.habits
+    .filter((h) => !h.archived)
+    .map((habit) => ({
+      habit,
+      count: weekKeys.filter((key) => d.dailyLogs[key]?.habits[habit.id]).length,
+      target: habit.cadence === "daily" ? 7 : habit.weeklyTarget,
+      doneToday: Boolean(d.dailyLogs[todayKey]?.habits[habit.id]),
+    }));
+}
+
+/** Which month of the 3-month plan we're in (1-based, clamped at 3). */
+export function programMonth(d: AppData): number {
+  const start = Date.parse(d.programStartISO);
+  if (!Number.isFinite(start)) return 1;
+  const days = Math.floor((Date.now() - start) / 86_400_000);
+  return Math.min(3, Math.max(1, Math.floor(days / 30) + 1));
+}
+
+/** Average protein and water over the last `days`, ignoring untouched days. */
+export function nutritionAverages(d: AppData, days = 7): { protein: number; water: number } {
+  const keys = Array.from({ length: days }, (_, i) => dayKey(addDays(new Date(), -i)));
+  const logged = keys.map((k) => d.dailyLogs[k]).filter((l): l is DailyLog => Boolean(l));
+  if (logged.length === 0) return { protein: 0, water: 0 };
+  return {
+    protein: Math.round(logged.reduce((s, l) => s + l.proteinGrams, 0) / logged.length),
+    water: Math.round(logged.reduce((s, l) => s + l.waterGlasses, 0) / logged.length),
+  };
 }

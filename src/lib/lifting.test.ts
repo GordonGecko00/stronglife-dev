@@ -108,7 +108,7 @@ describe("one-rep max", () => {
   });
 });
 
-function makeLog(reps: (number | null)[], targetReps = 5): ExerciseLog {
+function makeLog(reps: (number | null)[], targetReps = 5, targetRepsMax = targetReps): ExerciseLog {
   const sets: SetLog[] = reps.map((r) => ({
     kind: "work",
     targetReps,
@@ -119,11 +119,17 @@ function makeLog(reps: (number | null)[], targetReps = 5): ExerciseLog {
   return {
     exerciseId: "x",
     name: "Squat",
+    tracking: "reps",
     targetReps,
+    targetRepsMax,
     weight: 100,
     increment: 5,
     usesBar: true,
     sets,
+    minutes: null,
+    targetMinutes: 0,
+    completed: false,
+    hint: "",
     note: "",
   };
 }
@@ -175,5 +181,74 @@ describe("unit conversion", () => {
 
   it("is a no-op for the same unit", () => {
     expect(convertRounded(137.5, "lb", "lb")).toBe(137.5);
+  });
+});
+
+describe("double progression (8-10 rep ranges)", () => {
+  const settings = { ...defaultSettings(), deloadAfterFails: 3, deloadPercent: 10 };
+
+  it("holds the weight while you are inside the range", () => {
+    // All sets at 8 — the bottom of 8-10. Chase reps, not weight.
+    const result = applyProgression(100, 5, 0, makeLog([8, 8, 8], 8, 10), settings);
+    expect(result).toMatchObject({ weight: 100, outcome: "hold", consecutiveFails: 0 });
+  });
+
+  it("still holds when only some sets reach the top", () => {
+    const result = applyProgression(100, 5, 0, makeLog([10, 9, 8], 8, 10), settings);
+    expect(result.outcome).toBe("hold");
+    expect(result.weight).toBe(100);
+  });
+
+  it("adds weight once every set reaches the top of the range", () => {
+    const result = applyProgression(100, 5, 0, makeLog([10, 10, 10], 8, 10), settings);
+    expect(result).toMatchObject({ weight: 105, outcome: "increase" });
+  });
+
+  it("counts dropping below the bottom of the range as a miss", () => {
+    const result = applyProgression(100, 5, 0, makeLog([8, 8, 7], 8, 10), settings);
+    expect(result).toMatchObject({ weight: 100, outcome: "repeat", consecutiveFails: 1 });
+  });
+
+  it("behaves exactly like linear progression when the range is a single number", () => {
+    expect(applyProgression(100, 5, 0, makeLog([5, 5, 5], 5, 5), settings).outcome).toBe("increase");
+  });
+});
+
+describe("non-lifting exercises", () => {
+  const settings = defaultSettings();
+
+  function durationLog(minutes: number | null, target: number): ExerciseLog {
+    return {
+      ...makeLog([]),
+      name: "HIIT",
+      tracking: "duration",
+      minutes,
+      targetMinutes: target,
+      sets: [],
+    };
+  }
+
+  it("counts a duration exercise as hit once the target minutes are in", () => {
+    expect(hitAllTargets(durationLog(20, 20))).toBe(true);
+    expect(hitAllTargets(durationLog(25, 20))).toBe(true);
+    expect(hitAllTargets(durationLog(12, 20))).toBe(false);
+    expect(hitAllTargets(durationLog(null, 20))).toBe(false);
+  });
+
+  it("never changes the weight of a duration exercise", () => {
+    const result = applyProgression(0, 5, 0, durationLog(30, 30), settings);
+    expect(result).toMatchObject({ weight: 0, outcome: "hold", consecutiveFails: 0 });
+  });
+
+  it("never accumulates fails against a checkbox exercise", () => {
+    const plank: ExerciseLog = { ...makeLog([]), tracking: "done", sets: [], completed: false };
+    const result = applyProgression(0, 5, 2, plank, settings);
+    expect(result).toMatchObject({ weight: 0, outcome: "hold", consecutiveFails: 0 });
+  });
+
+  it("treats a checkbox exercise as hit only when ticked", () => {
+    const plank: ExerciseLog = { ...makeLog([]), tracking: "done", sets: [], completed: true };
+    expect(hitAllTargets(plank)).toBe(true);
+    expect(hitAllTargets({ ...plank, completed: false })).toBe(false);
   });
 });

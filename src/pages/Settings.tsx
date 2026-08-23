@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useAppData, replaceAll, resetAll } from "../store/store";
-import { patchSettings, setUnit } from "../store/actions";
+import { addHabit, patchHabit, patchSettings, removeHabit, setUnit } from "../store/actions";
 import {
   backupFilename,
   bodyWeightCSV,
@@ -11,7 +11,7 @@ import {
   toJSON,
 } from "../lib/backup";
 import { DEFAULT_PLATES, formatWeight } from "../lib/units";
-import type { Theme, Unit } from "../types";
+import type { Habit, Theme, Unit } from "../types";
 
 export default function Settings() {
   const data = useAppData();
@@ -152,6 +152,45 @@ export default function Settings() {
 
       <div className="card">
         <div className="card-head">
+          <h2>Nutrition targets</h2>
+        </div>
+        <label className="field">
+          <span>Protein per {settings.unit} of body weight (g)</span>
+          <input
+            type="number"
+            min={0}
+            max={2}
+            step="0.05"
+            inputMode="decimal"
+            value={settings.proteinPerUnit}
+            onChange={(event) =>
+              patchSettings({ proteinPerUnit: Math.max(0, Number(event.target.value) || 0) })
+            }
+          />
+        </label>
+        <p className="muted">
+          0.7–1.0 g per lb is the usual range for building muscle. Your daily goal is worked out
+          from your latest body weight.
+        </p>
+        <label className="field">
+          <span>Glasses of water a day</span>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            inputMode="numeric"
+            value={settings.waterTarget}
+            onChange={(event) =>
+              patchSettings({ waterTarget: Math.min(20, Math.max(1, Number(event.target.value) || 1)) })
+            }
+          />
+        </label>
+      </div>
+
+      <HabitsCard />
+
+      <div className="card">
+        <div className="card-head">
           <h2>Progression</h2>
         </div>
         <label className="field">
@@ -279,6 +318,101 @@ export default function Settings() {
       <p className="muted footnote">
         StrongLife · your data never leaves this device.
       </p>
+    </div>
+  );
+}
+
+function HabitsCard() {
+  const data = useAppData();
+  const [name, setName] = useState("");
+  const [group, setGroup] = useState<Habit["group"]>("mind");
+  const [cadence, setCadence] = useState<Habit["cadence"]>("daily");
+
+  return (
+    <div className="card">
+      <div className="card-head">
+        <h2>Habits</h2>
+      </div>
+      <p className="muted">These are the tick boxes on your daily check-in.</p>
+
+      {data.habits.map((habit) => (
+        <div className="habit-edit" key={habit.id}>
+          <input
+            value={habit.name}
+            aria-label="Habit name"
+            onChange={(event) => patchHabit(habit.id, { name: event.target.value })}
+          />
+          <select
+            aria-label="Cadence"
+            value={habit.cadence}
+            onChange={(event) =>
+              patchHabit(habit.id, { cadence: event.target.value as Habit["cadence"] })
+            }
+          >
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+          </select>
+          {habit.cadence === "weekly" && (
+            <input
+              type="number"
+              min={1}
+              max={7}
+              aria-label="Times per week"
+              className="tiny-input"
+              value={habit.weeklyTarget}
+              onChange={(event) =>
+                patchHabit(habit.id, {
+                  weeklyTarget: Math.min(7, Math.max(1, Number(event.target.value) || 1)),
+                })
+              }
+            />
+          )}
+          <button
+            className="icon-btn"
+            aria-label={`Remove ${habit.name}`}
+            onClick={() => removeHabit(habit.id)}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+
+      <form
+        className="inline-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!name.trim()) return;
+          addHabit(name.trim(), group, cadence);
+          setName("");
+        }}
+      >
+        <input
+          value={name}
+          placeholder="New habit"
+          aria-label="New habit"
+          onChange={(event) => setName(event.target.value)}
+        />
+        <select
+          aria-label="Group"
+          value={group}
+          onChange={(event) => setGroup(event.target.value as Habit["group"])}
+        >
+          <option value="nutrition">Food</option>
+          <option value="mind">Mind</option>
+          <option value="other">Other</option>
+        </select>
+        <select
+          aria-label="New habit cadence"
+          value={cadence}
+          onChange={(event) => setCadence(event.target.value as Habit["cadence"])}
+        >
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+        </select>
+        <button className="btn btn-small btn-ghost" type="submit">
+          Add
+        </button>
+      </form>
     </div>
   );
 }
