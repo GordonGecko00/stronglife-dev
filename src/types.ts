@@ -1,4 +1,23 @@
 export type Unit = "lb" | "kg";
+export type Theme = "system" | "light" | "dark";
+export type SetKind = "warmup" | "work";
+export type ScheduleMode = "fixed" | "rotating";
+
+export interface Settings {
+  unit: Unit;
+  /** Weight of the empty bar, in `unit`. */
+  barWeight: number;
+  /** Plate denominations available in the gym, in `unit`, largest first. */
+  plates: number[];
+  restSec: number;
+  /** Longer rest offered after a set that missed its target reps. */
+  restAfterFailSec: number;
+  warmupEnabled: boolean;
+  deloadAfterFails: number;
+  deloadPercent: number;
+  theme: Theme;
+  vibrate: boolean;
+}
 
 export interface Exercise {
   id: string;
@@ -7,9 +26,11 @@ export interface Exercise {
   targetReps: number;
   weight: number;
   increment: number;
-  unit: Unit;
-  /** Consecutive sessions where this exercise failed to hit all target reps. */
+  /** Consecutive sessions that failed to hit target reps on every set. */
   consecutiveFails: number;
+  /** Barbell movement — drives the plate calculator and the warmup ramp. */
+  usesBar: boolean;
+  useWarmup: boolean;
 }
 
 export interface WorkoutTemplate {
@@ -18,12 +39,22 @@ export interface WorkoutTemplate {
   exercises: Exercise[];
 }
 
-/** Maps day-of-week (0 = Sunday .. 6 = Saturday) to a template id, or null for rest day. */
-export type WeeklySchedule = Record<number, string | null>;
+export interface Schedule {
+  mode: ScheduleMode;
+  /** `fixed`: day-of-week (0 = Sunday) -> template id, or null for a rest day. */
+  days: Record<number, string | null>;
+  /** `rotating`: which days of the week are training days. */
+  trainingDays: Record<number, boolean>;
+  /** `rotating`: template ids cycled through, one per training day. */
+  rotation: string[];
+  rotationIndex: number;
+}
 
 export interface SetLog {
-  reps: number;
+  kind: SetKind;
+  targetReps: number;
   weight: number;
+  reps: number | null;
   done: boolean;
 }
 
@@ -31,11 +62,11 @@ export interface ExerciseLog {
   exerciseId: string;
   name: string;
   targetReps: number;
-  unit: Unit;
-  sets: SetLog[];
-  /** Weight used going into this exercise; may be bumped for next time on completion. */
   weight: number;
   increment: number;
+  usesBar: boolean;
+  sets: SetLog[];
+  note: string;
 }
 
 export interface WorkoutSession {
@@ -45,12 +76,27 @@ export interface WorkoutSession {
   dateISO: string;
   startedAt: number;
   finishedAt: number | null;
+  /** Unit the weights were recorded in, so history stays truthful after a unit switch. */
+  unit: Unit;
   exercises: ExerciseLog[];
+  note: string;
+}
+
+export interface BodyWeightEntry {
+  id: string;
+  dateISO: string;
+  weight: number;
+  unit: Unit;
 }
 
 export interface AppData {
+  version: number;
+  settings: Settings;
   templates: WorkoutTemplate[];
-  schedule: WeeklySchedule;
+  schedule: Schedule;
   sessions: WorkoutSession[];
   activeSessionId: string | null;
+  /** Epoch ms the current rest period ends, persisted so it survives navigation and reloads. */
+  restEndsAt: number | null;
+  bodyWeights: BodyWeightEntry[];
 }
