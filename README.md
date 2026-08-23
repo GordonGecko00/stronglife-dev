@@ -47,7 +47,5 @@ npm run preview # serve the production build locally
 ## Deployment
 
 A GitHub Actions workflow (`.github/workflows/deploy.yml`) builds this app
-and deploys it to GitHub Pages on every push to `main`. One-time setup: in
-the repo's **Settings → Pages**, set **Source** to "GitHub Actions" (free for
-public repos). After that, pushes to `main` deploy automatically and the app
-is available at `https://<your-username>.github.io/stronglife-dev/`.
+and deploys it to GitHub Pages on every push to `main`. The app is available
+at https://gordongecko00.github.io/stronglife-dev/.
