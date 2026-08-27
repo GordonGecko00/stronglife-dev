@@ -10,7 +10,9 @@ export interface Series {
   points: SeriesPoint[];
 }
 
-const PADDING = { top: 12, right: 14, bottom: 22, left: 40 };
+const PADDING = { top: 12, right: 14, bottom: 22 };
+/** Enough room for a weight label; money labels are measured and get more. */
+const MIN_LEFT = 40;
 const HEIGHT = 180;
 const MARKER_LIMIT = 24;
 
@@ -23,24 +25,35 @@ function niceTicks(min: number, max: number, count = 3): number[] {
 /**
  * Single- or two-series time chart. Both series share one y-axis and one unit —
  * a second scale would make the crossing point meaningless.
+ *
+ * Values default to weight formatting, which is what every lifting chart wants;
+ * `formatValue` / `formatAxis` let the money views render currency through the
+ * same component instead of forking it.
  */
 export default function LineChart({
   series,
   unit,
   caption,
+  formatValue = (value) => formatWeight(Math.round(value * 10) / 10),
+  formatAxis = (value) => formatWeight(Math.round(value)),
+  emptyLabel = "Not enough history yet — finish a workout to start the chart.",
 }: {
   series: Series[];
   unit: string;
   caption?: string;
+  formatValue?: (value: number) => string;
+  formatAxis?: (value: number) => string;
+  emptyLabel?: string;
 }) {
   const { ref, width } = useElementWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const [showTable, setShowTable] = useState(false);
 
-  const { visible, allPoints, scale } = useMemo(() => {
+  const { visible, allPoints, scale, ticks, padLeft } = useMemo(() => {
     const visible = series.filter((s) => s.points.length > 0);
     const allPoints = visible.flatMap((s) => s.points);
-    if (allPoints.length === 0) return { visible, allPoints, scale: null };
+    const empty = { visible, allPoints, scale: null, ticks: [] as number[], padLeft: MIN_LEFT };
+    if (allPoints.length === 0) return empty;
 
     const xs = allPoints.map((p) => p.x);
     const ys = allPoints.map((p) => p.y);
@@ -49,39 +62,49 @@ export default function LineChart({
     const yMinRaw = Math.min(...ys);
     const yMaxRaw = Math.max(...ys);
     // Pad the y-range so a flat line doesn't sit on the axis.
-    const span = yMaxRaw - yMinRaw || Math.max(yMaxRaw * 0.1, 1);
-    const yMin = Math.max(0, yMinRaw - span * 0.15);
+    const span = yMaxRaw - yMinRaw || Math.max(Math.abs(yMaxRaw) * 0.1, 1);
+    // Weights can't go below zero, so the axis is anchored there; net worth can
+    // (a mortgage outweighs the portfolio), and clamping it would invert the axis.
+    const padded = yMinRaw - span * 0.15;
+    const yMin = yMinRaw >= 0 ? Math.max(0, padded) : padded;
     const yMax = yMaxRaw + span * 0.15;
-    const plotWidth = Math.max(1, width - PADDING.left - PADDING.right);
+
+    const ticks = niceTicks(yMin, yMax);
+    // Currency labels are far wider than "185", so make room for the longest.
+    const longest = ticks.reduce((max, tick) => Math.max(max, formatAxis(tick).length), 0);
+    const padLeft = Math.max(MIN_LEFT, longest * 7 + 10);
+
+    const plotWidth = Math.max(1, width - padLeft - PADDING.right);
     const plotHeight = HEIGHT - PADDING.top - PADDING.bottom;
 
     return {
       visible,
       allPoints,
+      ticks,
+      padLeft,
       scale: {
         xMin,
         xMax,
         yMin,
         yMax,
         x: (value: number) =>
-          PADDING.left +
+          padLeft +
           (xMax === xMin ? plotWidth / 2 : ((value - xMin) / (xMax - xMin)) * plotWidth),
         y: (value: number) =>
           PADDING.top + plotHeight - ((value - yMin) / (yMax - yMin || 1)) * plotHeight,
       },
     };
-  }, [series, width]);
+  }, [series, width, formatAxis]);
 
   // A single data point has no trend to draw; the value itself is the story.
   if (allPoints.length === 0 || !scale) {
     return (
       <div className="chart-empty" ref={ref}>
-        Not enough history yet — finish a workout to start the chart.
+        {emptyLabel}
       </div>
     );
   }
 
-  const ticks = niceTicks(scale.yMin, scale.yMax);
   const timeline = [...new Set(allPoints.map((p) => p.x))].sort((a, b) => a - b);
   const hoverX = hover !== null ? timeline[hover] : null;
 
@@ -126,18 +149,18 @@ export default function LineChart({
           <g key={tick}>
             <line
               className="chart-grid"
-              x1={PADDING.left}
+              x1={padLeft}
               x2={width - PADDING.right}
               y1={scale.y(tick)}
               y2={scale.y(tick)}
             />
-            <text className="chart-axis-label" x={PADDING.left - 6} y={scale.y(tick) + 4} textAnchor="end">
-              {formatWeight(Math.round(tick))}
+            <text className="chart-axis-label" x={padLeft - 6} y={scale.y(tick) + 4} textAnchor="end">
+              {formatAxis(tick)}
             </text>
           </g>
         ))}
 
-        <text className="chart-axis-label" x={PADDING.left} y={HEIGHT - 6}>
+        <text className="chart-axis-label" x={padLeft} y={HEIGHT - 6}>
           {formatShortDate(scale.xMin)}
         </text>
         {scale.xMax !== scale.xMin && (
@@ -201,7 +224,8 @@ export default function LineChart({
             return (
               <span key={s.name}>
                 <span className="chart-swatch" style={{ background: s.color }} aria-hidden="true" />
-                {s.name} {formatWeight(Math.round(point.y * 10) / 10)} {unit}
+                {s.name} {formatValue(point.y)}
+                {unit ? ` ${unit}` : ""}
               </span>
             );
           })}
@@ -220,7 +244,7 @@ export default function LineChart({
                 <th>Date</th>
                 {visible.map((s) => (
                   <th key={s.name}>
-                    {s.name} ({unit})
+                    {unit ? `${s.name} (${unit})` : s.name}
                   </th>
                 ))}
               </tr>
@@ -231,7 +255,7 @@ export default function LineChart({
                   <td>{formatShortDate(x)}</td>
                   {visible.map((s) => {
                     const point = s.points.find((p) => p.x === x);
-                    return <td key={s.name}>{point ? formatWeight(Math.round(point.y * 10) / 10) : "—"}</td>;
+                    return <td key={s.name}>{point ? formatValue(point.y) : "—"}</td>;
                   })}
                 </tr>
               ))}

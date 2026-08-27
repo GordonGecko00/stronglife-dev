@@ -10,6 +10,9 @@ import History from "./pages/History";
 import Settings from "./pages/Settings";
 import Milestones from "./pages/Milestones";
 import More from "./pages/More";
+import Money from "./pages/Money";
+import MoneySetup from "./pages/MoneySetup";
+import Market from "./pages/Market";
 import Session from "./pages/Session";
 import { useAppData } from "./store/store";
 
@@ -47,6 +50,9 @@ export default function App() {
           <Route path="/program" element={<Program />} />
           <Route path="/progress" element={<Progress />} />
           <Route path="/history" element={<History />} />
+          <Route path="/money" element={<Money />} />
+          <Route path="/money/setup" element={<MoneySetup />} />
+          <Route path="/market" element={<Market />} />
           <Route path="/more" element={<More />} />
           <Route path="/milestones" element={<Milestones />} />
           <Route path="/settings" element={<Settings />} />

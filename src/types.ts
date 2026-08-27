@@ -40,6 +40,7 @@ export interface Settings {
   proteinPerUnit: number;
   waterTarget: number;
   recovery: RecoveryRule;
+  money: MoneySettings;
 }
 
 export interface Exercise {
@@ -186,4 +187,98 @@ export interface AppData {
   milestones: Milestone[];
   /** When the plan started, for working out which month you're in. */
   programStartISO: string;
+
+  accounts: Account[];
+  holdings: Holding[];
+  liabilities: Liability[];
+  watchlist: WatchItem[];
+  /** Net worth snapshots, oldest first, at most one per day. */
+  netWorth: NetWorthPoint[];
+  /** Cached prices keyed by upper-case symbol, so the portfolio renders offline. */
+  quotes: Record<string, Quote>;
+}
+
+/* --------------------------------------------------------------- money */
+
+export type Currency = "USD" | "CAD" | "EUR" | "GBP" | "AUD";
+
+/** What a holding is, which drives the allocation breakdown. */
+export type AssetClass = "stock" | "etf" | "bond" | "crypto" | "cash" | "other";
+
+/** Tax wrapper or account type, so registered money is easy to spot. */
+export type AccountKind =
+  | "taxable"
+  | "tfsa"
+  | "rrsp"
+  | "401k"
+  | "ira"
+  | "pension"
+  | "crypto"
+  | "savings"
+  | "other";
+
+/** Where prices come from. `manual` never touches the network. */
+export type QuoteSource = "stooq" | "manual";
+
+export interface Account {
+  id: string;
+  name: string;
+  kind: AccountKind;
+  /** Uninvested cash in the account, in the portfolio currency. */
+  cash: number;
+}
+
+export interface Holding {
+  id: string;
+  accountId: string;
+  /** Ticker as you'd type it: AAPL, VOO, BTC-USD, ^GSPC. */
+  symbol: string;
+  name: string;
+  assetClass: AssetClass;
+  quantity: number;
+  /** What you paid per unit, for gain/loss. */
+  costPerUnit: number;
+  /** Price entered by hand — used when no quote is available, or in manual mode. */
+  manualPrice: number | null;
+}
+
+/** A debt, subtracted from net worth. */
+export interface Liability {
+  id: string;
+  name: string;
+  balance: number;
+}
+
+export interface WatchItem {
+  id: string;
+  symbol: string;
+  name: string;
+}
+
+/** One saved point on the net-worth curve. Keyed by local day; latest wins. */
+export interface NetWorthPoint {
+  dayKey: string;
+  invested: number;
+  cash: number;
+  liabilities: number;
+}
+
+/** A cached price. `previousClose` is what the day change is measured against. */
+export interface Quote {
+  symbol: string;
+  price: number;
+  previousClose: number;
+  /** Epoch ms of the last bar, i.e. how fresh the market data itself is. */
+  asOf: number;
+  /** Epoch ms we fetched it, for the "updated X ago" line. */
+  fetchedAt: number;
+  /** Recent closes, oldest first, for the sparkline. */
+  history: number[];
+}
+
+export interface MoneySettings {
+  currency: Currency;
+  source: QuoteSource;
+  /** Blur balances until tapped, for reading somewhere public. */
+  privacy: boolean;
 }

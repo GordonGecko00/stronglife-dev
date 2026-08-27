@@ -475,7 +475,9 @@ h2 {
 
 .stat-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* minmax(0,...) rather than 1fr: a long value (a six-figure balance) would
+     otherwise set the column's minimum width and push the row off screen. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -1542,4 +1544,243 @@ h2 {
 
 .effort-hint {
   font-size: 12px;
+}
+
+/* --------------------------------------------------------------- money */
+
+.money-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.money-head h1 {
+  margin-bottom: 2px;
+}
+
+/* Currency runs longer than a rep count, so the money tiles size down to fit. */
+.money-page .stat-value {
+  font-size: 18px;
+}
+
+.money-page .stat-tile {
+  padding: 13px 6px;
+}
+
+.money-status {
+  margin: -4px 0 0;
+}
+
+/* Blur balances for reading somewhere public. The values are still in the DOM —
+   this hides them from a shoulder, not from anyone with the device. */
+.money-private .money-value {
+  filter: blur(7px);
+  user-select: none;
+}
+
+.delta-up {
+  color: var(--hit);
+}
+
+.delta-down {
+  color: var(--miss);
+}
+
+.delta-flat {
+  color: var(--muted);
+}
+
+.account-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 19px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+}
+
+.account-total span:last-child {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------ allocation bar */
+
+.allocation {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.allocation-bar {
+  display: flex;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.allocation-segment {
+  height: 100%;
+  min-width: 2px;
+}
+
+.allocation-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.allocation-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.allocation-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.allocation-percent {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.allocation-value {
+  font-variant-numeric: tabular-nums;
+  min-width: 72px;
+  text-align: right;
+}
+
+/* ------------------------------------------------------- holding rows */
+
+.holding-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.holding-row,
+.quote-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.holding-name,
+.quote-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.holding-name strong,
+.quote-name strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.holding-values,
+.quote-values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.holding-values span:first-child,
+.quote-values span:first-child {
+  font-weight: 600;
+}
+
+.holding-cash {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 10px;
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+
+.holding-editor {
+  border-top: 1px solid var(--border);
+  padding-top: 4px;
+  margin-top: 4px;
+}
+
+/* ------------------------------------------------------------- market */
+
+.quote-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.quote-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.sparkline {
+  flex: none;
+  opacity: 0.9;
+}
+
+.sparkline-empty {
+  display: inline-block;
+  width: 64px;
+}
+
+/* `.btn` is full-width by default, which would crowd out the symbol field. */
+.watch-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.watch-form .btn {
+  width: auto;
+  flex: none;
+  padding: 15px 20px;
+}
+
+.market-pill {
+  flex: none;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface-2);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.market-open {
+  background: var(--hit-bg);
+  color: var(--hit);
+}
+
+.market-pre,
+.market-after {
+  background: var(--surface-3);
+  color: var(--text-secondary);
 }

@@ -4,6 +4,7 @@ import { addHabit, patchHabit, patchSettings, removeHabit, setUnit } from "../st
 import {
   backupFilename,
   bodyWeightCSV,
+  holdingsCSV,
   copyToClipboard,
   downloadFile,
   parseBackup,
@@ -267,6 +268,19 @@ export default function Settings() {
             }
           >
             Export body weight (CSV)
+          </button>
+        )}
+        {data.holdings.length > 0 && (
+          <button
+            className="btn btn-ghost"
+            onClick={() => {
+              const prices = Object.fromEntries(
+                Object.values(data.quotes).map((quote) => [quote.symbol, quote.price])
+              );
+              share(holdingsCSV(data, prices), `stronglife-holdings.csv`, "text/csv");
+            }}
+          >
+            Export holdings (CSV)
           </button>
         )}
 

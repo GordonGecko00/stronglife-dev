@@ -1,22 +1,35 @@
 import type {
+  Account,
+  AccountKind,
   AppData,
+  AssetClass,
+  Currency,
   DailyLog,
   Exercise,
   Habit,
+  Holding,
+  Liability,
   Milestone,
+  MoneySettings,
+  NetWorthPoint,
+  Quote,
   SessionKind,
   Settings,
   Theme,
   TrackingMode,
   Unit,
+  WatchItem,
 } from "../types";
 import {
   buildDefaultData,
   buildHabits,
   buildMilestones,
+  buildWatchlist,
   DATA_VERSION,
+  defaultMoneySettings,
   defaultSettings,
 } from "./defaults";
+import { symbolKey } from "../lib/quotes";
 import { DEFAULT_BAR, DEFAULT_PLATES } from "../lib/units";
 
 type Loose = Record<string, unknown>;
@@ -74,6 +87,7 @@ function normalizeSettings(raw: unknown): Settings {
     proteinPerUnit: num(raw.proteinPerUnit, base.proteinPerUnit),
     waterTarget: num(raw.waterTarget, base.waterTarget),
     recovery: normalizeRecovery(raw.recovery, base),
+    money: normalizeMoneySettings(raw.money),
   };
 }
 
@@ -247,6 +261,115 @@ function normalizeMilestones(raw: unknown): Milestone[] {
   return milestones.length ? milestones : buildMilestones();
 }
 
+/* ------------------------------------------------------------ money */
+
+const CURRENCY_CODES: Currency[] = ["USD", "CAD", "EUR", "GBP", "AUD"];
+const ASSET_CLASSES: AssetClass[] = ["stock", "etf", "bond", "crypto", "cash", "other"];
+const ACCOUNT_KINDS: AccountKind[] = [
+  "taxable",
+  "tfsa",
+  "rrsp",
+  "401k",
+  "ira",
+  "pension",
+  "crypto",
+  "savings",
+  "other",
+];
+
+function oneOf<T extends string>(value: unknown, allowed: T[], fallback: T): T {
+  return allowed.includes(value as T) ? (value as T) : fallback;
+}
+
+function normalizeMoneySettings(raw: unknown): MoneySettings {
+  const base = defaultMoneySettings();
+  if (!isObject(raw)) return base;
+  return {
+    currency: oneOf(raw.currency, CURRENCY_CODES, base.currency),
+    source: raw.source === "manual" ? "manual" : "stooq",
+    privacy: bool(raw.privacy, base.privacy),
+  };
+}
+
+function normalizeAccounts(raw: unknown): Account[] {
+  return asArray(raw).map((a) => ({
+    id: str(a.id, crypto.randomUUID()),
+    name: str(a.name, "Account"),
+    kind: oneOf(a.kind, ACCOUNT_KINDS, "other"),
+    cash: num(a.cash, 0),
+  }));
+}
+
+function normalizeHoldings(raw: unknown): Holding[] {
+  return asArray(raw).map((h) => ({
+    id: str(h.id, crypto.randomUUID()),
+    accountId: str(h.accountId, ""),
+    symbol: symbolKey(str(h.symbol, "")),
+    name: str(h.name, ""),
+    assetClass: oneOf(h.assetClass, ASSET_CLASSES, "other"),
+    quantity: num(h.quantity, 0),
+    costPerUnit: num(h.costPerUnit, 0),
+    // Zero is a real price; only a missing or unusable value means "no override".
+    manualPrice:
+      typeof h.manualPrice === "number" && Number.isFinite(h.manualPrice) ? h.manualPrice : null,
+  }));
+}
+
+function normalizeLiabilities(raw: unknown): Liability[] {
+  return asArray(raw).map((l) => ({
+    id: str(l.id, crypto.randomUUID()),
+    name: str(l.name, "Debt"),
+    balance: num(l.balance, 0),
+  }));
+}
+
+function normalizeWatchlist(raw: unknown): WatchItem[] {
+  const seen = new Set<string>();
+  const items: WatchItem[] = [];
+  for (const w of asArray(raw)) {
+    const symbol = symbolKey(str(w.symbol, ""));
+    if (!symbol || seen.has(symbol)) continue;
+    seen.add(symbol);
+    items.push({ id: str(w.id, crypto.randomUUID()), symbol, name: str(w.name, symbol) });
+  }
+  // An empty list is indistinguishable from "never set up", so seed the indexes.
+  return items.length ? items : buildWatchlist();
+}
+
+function normalizeNetWorth(raw: unknown): NetWorthPoint[] {
+  return asArray(raw)
+    .map((p) => ({
+      dayKey: str(p.dayKey, ""),
+      invested: num(p.invested, 0),
+      cash: num(p.cash, 0),
+      liabilities: num(p.liabilities, 0),
+    }))
+    .filter((p) => /^\d{4}-\d{2}-\d{2}$/.test(p.dayKey))
+    .sort((a, b) => a.dayKey.localeCompare(b.dayKey));
+}
+
+function normalizeQuotes(raw: unknown): Record<string, Quote> {
+  if (!isObject(raw)) return {};
+  const quotes: Record<string, Quote> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (!isObject(value)) continue;
+    const symbol = symbolKey(str(value.symbol, key));
+    const price = num(value.price, 0);
+    if (!symbol || price <= 0) continue;
+    quotes[symbol] = {
+      symbol,
+      price,
+      previousClose: num(value.previousClose, price) || price,
+      asOf: num(value.asOf, 0),
+      fetchedAt: num(value.fetchedAt, 0),
+      history: Array.isArray(value.history)
+        ? value.history.filter((n): n is number => typeof n === "number" && Number.isFinite(n))
+        : [],
+    };
+  }
+  return quotes;
+}
+
 function normalizeCurrent(raw: Loose): AppData {
   const settings = normalizeSettings(raw.settings);
   const templates = normalizeTemplates(raw.templates);
@@ -278,6 +401,12 @@ function normalizeCurrent(raw: Loose): AppData {
     dailyLogs: normalizeDailyLogs(raw.dailyLogs),
     milestones: normalizeMilestones(raw.milestones),
     programStartISO: str(raw.programStartISO, new Date().toISOString()),
+    accounts: normalizeAccounts(raw.accounts),
+    holdings: normalizeHoldings(raw.holdings),
+    liabilities: normalizeLiabilities(raw.liabilities),
+    watchlist: normalizeWatchlist(raw.watchlist),
+    netWorth: normalizeNetWorth(raw.netWorth),
+    quotes: normalizeQuotes(raw.quotes),
   };
 }
 
@@ -331,5 +460,11 @@ function fromV1(raw: Loose): AppData {
     dailyLogs: {},
     milestones: buildMilestones(),
     programStartISO: new Date().toISOString(),
+    accounts: [],
+    holdings: [],
+    liabilities: [],
+    watchlist: buildWatchlist(),
+    netWorth: [],
+    quotes: {},
   };
 }

@@ -1,6 +1,8 @@
 import type {
   AppData,
   Exercise,
+  MoneySettings,
+  WatchItem,
   Habit,
   Milestone,
   Settings,
@@ -10,7 +12,7 @@ import type {
 import { DEFAULT_BAR, DEFAULT_PLATES } from "../lib/units";
 import { uid } from "../lib/misc";
 
-export const DATA_VERSION = 3;
+export const DATA_VERSION = 4;
 
 export function defaultSettings(): Settings {
   return {
@@ -32,7 +34,21 @@ export function defaultSettings(): Settings {
       action: "recovery",
       recoveryTemplateId: null,
     },
+    money: defaultMoneySettings(),
   };
+}
+
+export function defaultMoneySettings(): MoneySettings {
+  return { currency: "USD", source: "stooq", privacy: false };
+}
+
+/** The three headline US indexes, so the market view says something on day one. */
+export function buildWatchlist(): WatchItem[] {
+  return [
+    { id: uid(), symbol: "^SPX", name: "S&P 500" },
+    { id: uid(), symbol: "^DJI", name: "Dow Jones" },
+    { id: uid(), symbol: "^NDQ", name: "Nasdaq Composite" },
+  ];
 }
 
 function baseExercise(name: string, tracking: TrackingMode): Exercise {
@@ -243,5 +259,11 @@ export function buildDefaultData(): AppData {
     dailyLogs: {},
     milestones: buildMilestones(),
     programStartISO: new Date().toISOString(),
+    accounts: [],
+    holdings: [],
+    liabilities: [],
+    watchlist: buildWatchlist(),
+    netWorth: [],
+    quotes: {},
   };
 }

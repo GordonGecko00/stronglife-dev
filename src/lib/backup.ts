@@ -58,6 +58,40 @@ export function bodyWeightCSV(data: AppData): string {
   return rows.join("\n");
 }
 
+/** One row per holding, with the numbers a spreadsheet would want. */
+export function holdingsCSV(data: AppData, prices: Record<string, number>): string {
+  const accounts = new Map(data.accounts.map((a) => [a.id, a.name]));
+  const rows = [
+    ["account", "symbol", "name", "asset_class", "quantity", "cost_per_unit", "price", "value", "currency"].join(","),
+  ];
+
+  for (const holding of data.holdings) {
+    const price = prices[holding.symbol] ?? holding.costPerUnit;
+    rows.push(
+      [
+        csvCell(accounts.get(holding.accountId) ?? "Unassigned"),
+        csvCell(holding.symbol),
+        csvCell(holding.name),
+        holding.assetClass,
+        holding.quantity,
+        holding.costPerUnit,
+        price,
+        Math.round(price * holding.quantity * 100) / 100,
+        data.settings.money.currency,
+      ].join(",")
+    );
+  }
+
+  for (const account of data.accounts) {
+    if (account.cash === 0) continue;
+    rows.push(
+      [csvCell(account.name), "CASH", "Cash", "cash", "", "", "", account.cash, data.settings.money.currency].join(",")
+    );
+  }
+
+  return rows.join("\n");
+}
+
 export interface ParsedBackup {
   ok: boolean;
   data?: AppData;

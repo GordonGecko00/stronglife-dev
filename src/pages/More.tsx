@@ -3,6 +3,8 @@ import { useAppData } from "../store/store";
 import { programMonth } from "../store/selectors";
 
 const LINKS = [
+  { to: "/history", label: "History", hint: "Every workout you've logged" },
+  { to: "/market", label: "Market", hint: "Indexes, watchlist, today's movers" },
   { to: "/program", label: "Program", hint: "Schedule, sessions, hockey nights" },
   { to: "/milestones", label: "Milestones", hint: "The 3-month plan" },
   { to: "/settings", label: "Settings", hint: "Units, targets, habits, backup" },

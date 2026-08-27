@@ -60,6 +60,28 @@ Built around a six-day split with an evening sport in the mix: it knows that a
   total-volume stats.
 - **Body weight** logging and chart.
 
+### Money and markets
+- **Portfolio**: accounts (taxable, TFSA, RRSP, 401(k), crypto wallet…), the
+  holdings inside them, uninvested cash, and debts — netted into one net worth
+  figure with today's change and total gain since you bought in.
+- **Where you're invested**: a stacked breakdown by asset type or by account,
+  so the split is obvious at a glance.
+- **Net worth over time** — a snapshot is taken whenever you open the page, so
+  the curve fills in from ordinary use rather than a chore.
+- **Market view**: a watchlist (the three US indexes to start), live-ish day
+  changes with sparklines, a market open/closed indicator, and your own
+  holdings ranked by what moved today.
+- **Prices without an account.** Daily closes come from a free public source —
+  no API key, no sign-up, nothing to deploy. Yahoo-style tickers are translated
+  automatically (`^GSPC`, `SHOP.TO`, `BTC-USD` all work).
+- **It degrades honestly.** The source is a courtesy endpoint that can
+  rate-limit or be unreachable, and a static page can only read it while it
+  keeps sending permissive CORS headers. Every failure is reported on screen,
+  the last known prices are kept, and you can enter a price by hand for
+  anything — a private position, or the whole portfolio if you'd rather not
+  fetch at all.
+- **Hide balances** with one tap for reading on a train.
+
 ### Nutrition and mind
 - **Daily check-in**: protein against a target worked out from your latest body
   weight, water glasses, and a tick-box list of habits.
@@ -73,8 +95,8 @@ Built around a six-day split with an evening sport in the mix: it knows that a
 ### Your data
 - **Works offline.** Installed as a PWA with a service worker — no signal
   needed in the gym.
-- **Export** a full JSON backup, or a CSV with one row per logged set. Restore
-  from a file or pasted JSON.
+- **Export** a full JSON backup, a CSV with one row per logged set, or a CSV
+  of your holdings. Restore from a file or pasted JSON.
 - lb / kg switching converts every planned weight; past workouts keep the units
   they were logged in.
 - Light / dark / system theme.
@@ -96,7 +118,7 @@ Built around a six-day split with an evening sport in the mix: it knows that a
 ```bash
 npm install
 npm run dev      # dev server
-npm test         # plate/warmup/progression math + the scheduling rules
+npm test         # plate/warmup/progression math, scheduling rules, portfolio math
 npm run lint
 npm run build    # production build into dist/
 npm run preview  # serve the production build
@@ -108,11 +130,14 @@ App icons are generated, not checked in by hand: `node scripts/gen-icons.mjs`.
 
 ```
 src/
-  lib/        pure logic — plate math, warmup ramps, progression, 1RM, units, backup
+  lib/        pure logic — plate math, warmup ramps, progression, 1RM, units, backup,
+              portfolio valuation, money formatting, quote fetching and parsing
   store/      persisted state: defaults, versioned migrations, actions, selectors,
-              and planning.ts (the late-night rule and week plan)
-  components/ shared UI — set cells, plate chips, rest bar, charts, calendar
-  pages/      Today, Week, Session, Program, Progress, History, Milestones, Settings
+              planning.ts (the late-night rule and week plan) and finance.ts
+  components/ shared UI — set cells, plate chips, rest bar, charts, calendar,
+              sparklines, allocation bar
+  pages/      Today, Week, Session, Program, Progress, History, Money, Market,
+              MoneySetup, Milestones, Settings
 ```
 
 State is a single object in `localStorage` behind a `useSyncExternalStore`
@@ -125,6 +150,12 @@ field costs one setting instead of your training history.
 The scheduling logic lives in `store/planning.ts` and is pure: given the stored
 data and a date it returns what should happen that morning and evening, what
 was adjusted, and why. That keeps it testable — see `store/planning.test.ts`.
+
+Money works the same way. `lib/portfolio.ts` values holdings and totals them,
+`lib/quotes.ts` translates tickers and parses the price feed, and both are pure
+— see `lib/finance.test.ts`. Network access is confined to `lib/quotes.ts`,
+which reports failures instead of throwing, so `store/finance.ts` can always
+render the portfolio from whatever is cached.
 
 ## Deployment
 
