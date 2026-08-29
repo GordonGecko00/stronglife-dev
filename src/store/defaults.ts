@@ -10,7 +10,7 @@ import type {
 import { DEFAULT_BAR, DEFAULT_PLATES } from "../lib/units";
 import { uid } from "../lib/misc";
 
-export const DATA_VERSION = 3;
+export const DATA_VERSION = 4;
 
 export function defaultSettings(): Settings {
   return {
@@ -243,5 +243,7 @@ export function buildDefaultData(): AppData {
     dailyLogs: {},
     milestones: buildMilestones(),
     programStartISO: new Date().toISOString(),
+    onboardedAt: null,
+    tipsSeen: {},
   };
 }

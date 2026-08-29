@@ -186,4 +186,8 @@ export interface AppData {
   milestones: Milestone[];
   /** When the plan started, for working out which month you're in. */
   programStartISO: string;
+  /** Null until first-run setup is finished; drives the welcome flow. */
+  onboardedAt: string | null;
+  /** One-off coach tips the user has dismissed, keyed by id. */
+  tipsSeen: Record<string, boolean>;
 }

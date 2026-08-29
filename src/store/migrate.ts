@@ -278,6 +278,17 @@ function normalizeCurrent(raw: Loose): AppData {
     dailyLogs: normalizeDailyLogs(raw.dailyLogs),
     milestones: normalizeMilestones(raw.milestones),
     programStartISO: str(raw.programStartISO, new Date().toISOString()),
+    // Anyone with data from before the welcome flow existed has already set the
+    // app up by hand; don't send them back through it.
+    onboardedAt:
+      typeof raw.onboardedAt === "string"
+        ? raw.onboardedAt
+        : asArray(raw.sessions).length > 0
+          ? str(raw.programStartISO, new Date().toISOString())
+          : null,
+    tipsSeen: isObject(raw.tipsSeen)
+      ? Object.fromEntries(Object.entries(raw.tipsSeen).map(([k, v]) => [k, Boolean(v)]))
+      : {},
   };
 }
 
@@ -331,5 +342,7 @@ function fromV1(raw: Loose): AppData {
     dailyLogs: {},
     milestones: buildMilestones(),
     programStartISO: new Date().toISOString(),
+    onboardedAt: new Date().toISOString(),
+    tipsSeen: {},
   };
 }

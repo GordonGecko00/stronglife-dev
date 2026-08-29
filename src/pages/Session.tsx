@@ -12,6 +12,7 @@ import {
   setSessionNote,
   finishSession,
   cancelSession,
+  dismissTip,
 } from "../store/actions";
 import SetCell from "../components/SetCell";
 import PlateChips from "../components/PlateChips";
@@ -19,11 +20,21 @@ import { formatDuration, formatWeight } from "../lib/units";
 import { hitAllTargets } from "../lib/strength";
 import type { ExerciseLog } from "../types";
 
+const SET_TIP = "set-logging";
+
 export default function Session() {
   const data = useAppData();
   const navigate = useNavigate();
   const session = getActiveSession(data);
   const [elapsed, setElapsed] = useState(0);
+  // Which exercise card is expanded, tracked alongside the session it belongs
+  // to. It opens on the first unfinished exercise and then stays under the
+  // user's control: auto-advancing the moment the last set is tapped would
+  // collapse the card out from under their finger.
+  const [openCard, setOpenCard] = useState<{ sessionId: string | null; index: number }>({
+    sessionId: null,
+    index: 0,
+  });
 
   useEffect(() => {
     if (!session) return;
@@ -43,12 +54,22 @@ export default function Session() {
 
   if (!session) return null;
 
+  // Adjust state during render when the session changes, rather than in an
+  // effect, so there is no second render pass.
+  let openIndex = openCard.index;
+  if (openCard.sessionId !== session.id) {
+    const first = session.exercises.findIndex((ex) => !logDone(ex));
+    openIndex = first === -1 ? Math.max(0, session.exercises.length - 1) : first;
+    setOpenCard({ sessionId: session.id, index: openIndex });
+  }
+
   // Count every trackable item, so a cardio or yoga session can reach 100% too.
   const items = session.exercises.flatMap((ex) =>
     ex.tracking === "reps" ? ex.sets.filter((s) => s.kind === "work").map((s) => s.done) : [logDone(ex)]
   );
   const loggedCount = items.filter(Boolean).length;
   const allLogged = loggedCount === items.length && items.length > 0;
+
 
   return (
     <div className="page session-page">
@@ -78,12 +99,36 @@ export default function Session() {
       </div>
       <p className="muted">
         {loggedCount} of {items.length} logged
-        {session.exercises.some((e) => e.tracking === "reps") &&
-          " · tap a set to log, long-press for other rep counts"}
       </p>
 
+      {!data.tipsSeen[SET_TIP] && session.exercises.some((e) => e.tracking === "reps") && (
+        <div className="tip">
+          <div>
+            <strong>Logging sets</strong>
+            <p className="muted">
+              Tap a set once when you hit every rep. Tap again to count down (10 → 9 → 8…).
+              Long-press for a keypad.
+            </p>
+          </div>
+          <button className="btn btn-small btn-ghost" onClick={() => dismissTip(SET_TIP)}>
+            Got it
+          </button>
+        </div>
+      )}
+
       {session.exercises.map((log, index) => (
-        <ExerciseCard key={log.exerciseId} sessionId={session.id} log={log} index={index} />
+        <ExerciseCard
+          key={log.exerciseId}
+          sessionId={session.id}
+          log={log}
+          index={index}
+          open={index === openIndex}
+          isLast={index === session.exercises.length - 1}
+          onOpen={() =>
+            setOpenCard({ sessionId: session.id, index: index === openIndex ? -1 : index })
+          }
+          onNext={() => setOpenCard({ sessionId: session.id, index: index + 1 })}
+        />
       ))}
 
       <div className="field">
@@ -136,47 +181,91 @@ function logDone(log: ExerciseLog): boolean {
   return log.sets.filter((s) => s.kind === "work").every((s) => s.done);
 }
 
+/** One line describing what has been logged, shown when the card is collapsed. */
+function summaryOf(log: ExerciseLog, unit: string): string {
+  if (log.tracking === "duration") {
+    return log.minutes === null ? `${log.targetMinutes} min target` : `${log.minutes} min`;
+  }
+  if (log.tracking === "done") return log.completed ? "Done" : log.hint || "Not done yet";
+  const work = log.sets.filter((s) => s.kind === "work");
+  const logged = work.filter((s) => s.done);
+  if (logged.length === 0) {
+    return `${work.length}×${log.targetReps}${
+      log.targetRepsMax > log.targetReps ? `–${log.targetRepsMax}` : ""
+    } · ${formatWeight(log.weight)} ${unit}`;
+  }
+  return `${work.map((s) => (s.done ? s.reps : "–")).join("/")} · ${formatWeight(log.weight)} ${unit}`;
+}
+
 function ExerciseCard({
   sessionId,
   log,
   index,
+  open,
+  isLast,
+  onOpen,
+  onNext,
 }: {
   sessionId: string;
   log: ExerciseLog;
   index: number;
+  open: boolean;
+  isLast: boolean;
+  onOpen: () => void;
+  onNext: () => void;
 }) {
   const data = useAppData();
   const [showNote, setShowNote] = useState(log.note.length > 0);
   const { unit, barWeight, plates } = data.settings;
   const complete = hitAllTargets(log);
+  const logged = logDone(log);
 
   return (
-    <div className={`card exercise-card ${complete ? "exercise-done" : ""}`}>
-      <div className="card-head">
-        <h2>{log.name}</h2>
-        {complete && <span className="badge badge-hit">Done</span>}
-      </div>
-      {log.hint && <p className="muted">{log.hint}</p>}
+    <div className={`card exercise-card ${complete ? "exercise-done" : ""} ${open ? "" : "exercise-collapsed"}`}>
+      <button className="card-toggle" onClick={onOpen} aria-expanded={open}>
+        <div className="exercise-head">
+          <span className="exercise-title">
+            <span className={`exercise-status ${logged ? "exercise-status-on" : ""}`} aria-hidden="true">
+              {logged ? "✓" : index + 1}
+            </span>
+            <h2>{log.name}</h2>
+          </span>
+          {!open && <span className="muted">{summaryOf(log, unit)}</span>}
+        </div>
+        <span className="chevron">{open ? "▾" : "▸"}</span>
+      </button>
 
-      {log.tracking === "reps" && (
-        <RepsBody sessionId={sessionId} log={log} index={index} unit={unit} bar={barWeight} plates={plates} />
-      )}
-      {log.tracking === "duration" && <DurationBody sessionId={sessionId} log={log} index={index} />}
-      {log.tracking === "done" && <DoneBody sessionId={sessionId} log={log} index={index} />}
+      {open && (
+        <>
+          {log.hint && <p className="muted">{log.hint}</p>}
 
-      {showNote ? (
-        <label className="field">
-          <span>Note</span>
-          <input
-            value={log.note}
-            placeholder="Form cue, pain, how it felt…"
-            onChange={(event) => setExerciseNote(sessionId, index, event.target.value)}
-          />
-        </label>
-      ) : (
-        <button className="btn-link" onClick={() => setShowNote(true)}>
-          + Add note
-        </button>
+          {log.tracking === "reps" && (
+            <RepsBody sessionId={sessionId} log={log} index={index} unit={unit} bar={barWeight} plates={plates} />
+          )}
+          {log.tracking === "duration" && <DurationBody sessionId={sessionId} log={log} index={index} />}
+          {log.tracking === "done" && <DoneBody sessionId={sessionId} log={log} index={index} />}
+
+          {showNote ? (
+            <label className="field">
+              <span>Note</span>
+              <input
+                value={log.note}
+                placeholder="Form cue, pain, how it felt…"
+                onChange={(event) => setExerciseNote(sessionId, index, event.target.value)}
+              />
+            </label>
+          ) : (
+            <button className="btn-link" onClick={() => setShowNote(true)}>
+              + Add note
+            </button>
+          )}
+
+          {logged && !isLast && (
+            <button className="btn btn-ghost" onClick={onNext}>
+              Next exercise ›
+            </button>
+          )}
+        </>
       )}
     </div>
   );

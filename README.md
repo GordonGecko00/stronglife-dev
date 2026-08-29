@@ -8,6 +8,22 @@ Built around a six-day split with an evening sport in the mix: it knows that a
 
 **Live:** https://gordongecko00.github.io/stronglife-dev/
 
+## The daily loop
+
+1. **Open Today.** The top card is the single next thing to do — start the
+   session, log tonight's game, or finish the check-in — with one button. Under
+   it, a three-item list (session / evening / check-in) shows the whole day with
+   progress rings, so nothing is hidden.
+2. **Run the session.** One exercise is open at a time; the rest collapse to a
+   one-line summary. Tap sets to log, then "Next exercise".
+3. **Check in.** Protein, water, habits and body weight live in one card,
+   opened from the day list.
+4. **Sunday, look at Week.** What's planned, what moved, and why.
+
+First launch walks through a 30-second setup (units, body weight, which nights
+you play, what to do the morning after). More → How it works explains the flow
+in one screen and can re-run setup.
+
 ## Features
 
 ### Planning around a late sport

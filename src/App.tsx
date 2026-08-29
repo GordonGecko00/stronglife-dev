@@ -11,7 +11,10 @@ import Settings from "./pages/Settings";
 import Milestones from "./pages/Milestones";
 import More from "./pages/More";
 import Session from "./pages/Session";
+import Onboarding from "./pages/Onboarding";
+import Guide from "./pages/Guide";
 import { useAppData } from "./store/store";
+import { Navigate, useLocation } from "react-router-dom";
 
 function Layout({ withNav = true }: { withNav?: boolean }) {
   return (
@@ -35,11 +38,22 @@ function useTheme() {
   }, [theme]);
 }
 
+/** Send first-time users through setup before anything else. */
+function OnboardingGate() {
+  const onboardedAt = useAppData().onboardedAt;
+  const location = useLocation();
+  if (!onboardedAt && location.pathname !== "/welcome") {
+    return <Navigate to="/welcome" replace />;
+  }
+  return null;
+}
+
 export default function App() {
   useTheme();
 
   return (
     <HashRouter>
+      <OnboardingGate />
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Today />} />
@@ -49,10 +63,12 @@ export default function App() {
           <Route path="/history" element={<History />} />
           <Route path="/more" element={<More />} />
           <Route path="/milestones" element={<Milestones />} />
+          <Route path="/guide" element={<Guide />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
         <Route element={<Layout withNav={false} />}>
           <Route path="/session" element={<Session />} />
+          <Route path="/welcome" element={<Onboarding />} />
         </Route>
       </Routes>
     </HashRouter>

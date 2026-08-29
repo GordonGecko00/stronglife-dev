@@ -562,3 +562,77 @@ export function patchTemplate(templateId: string, fields: Partial<WorkoutTemplat
     if (template) Object.assign(template, fields);
   });
 }
+
+/* -------------------------------------------------------------- first run */
+
+export interface OnboardingChoices {
+  unit: Unit;
+  bodyWeight: number | null;
+  /** Days of the week with an evening sport. */
+  sportDays: number[];
+  sportMinutes: number;
+  recoveryAction: "recovery" | "skip" | "off";
+  lateHour: number;
+}
+
+/**
+ * Apply first-run answers in one go, so the app opens already shaped around
+ * the user's week rather than a generic default.
+ */
+export function completeOnboarding(choices: OnboardingChoices): void {
+  update((d) => {
+    if (choices.unit !== d.settings.unit) {
+      const from = d.settings.unit;
+      for (const template of d.templates) {
+        for (const exercise of template.exercises) {
+          exercise.weight = convertRounded(exercise.weight, from, choices.unit);
+          exercise.increment = convertRounded(exercise.increment, from, choices.unit);
+        }
+      }
+      d.settings.unit = choices.unit;
+      d.settings.barWeight = DEFAULT_BAR[choices.unit];
+      d.settings.plates = [...DEFAULT_PLATES[choices.unit]];
+    }
+
+    if (choices.bodyWeight && choices.bodyWeight > 0) {
+      d.bodyWeights.unshift({
+        id: uid(),
+        dateISO: new Date().toISOString(),
+        weight: choices.bodyWeight,
+        unit: choices.unit,
+      });
+    }
+
+    const sport = d.templates.find((t) => t.kind === "sport");
+    for (let day = 0; day < 7; day++) {
+      d.schedule.eveningDays[day] = choices.sportDays.includes(day) && sport ? sport.id : null;
+    }
+    if (sport && choices.sportMinutes > 0) {
+      const timed = sport.exercises.find((e) => e.tracking === "duration");
+      if (timed) timed.targetMinutes = choices.sportMinutes;
+    }
+
+    d.settings.recovery.enabled = choices.recoveryAction !== "off";
+    if (choices.recoveryAction !== "off") d.settings.recovery.action = choices.recoveryAction;
+    d.settings.recovery.lateHour = choices.lateHour;
+    if (!d.settings.recovery.recoveryTemplateId) {
+      d.settings.recovery.recoveryTemplateId =
+        d.templates.find((t) => t.kind === "recovery")?.id ?? null;
+    }
+
+    d.programStartISO = new Date().toISOString();
+    d.onboardedAt = new Date().toISOString();
+  });
+}
+
+export function restartOnboarding(): void {
+  update((d) => {
+    d.onboardedAt = null;
+  });
+}
+
+export function dismissTip(id: string): void {
+  update((d) => {
+    d.tipsSeen[id] = true;
+  });
+}

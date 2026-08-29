@@ -1543,3 +1543,306 @@ h2 {
 .effort-hint {
   font-size: 12px;
 }
+
+/* ----------------------------------------------------------- onboarding */
+
+.onboarding {
+  min-height: 100%;
+  justify-content: flex-start;
+}
+
+.progress-dots {
+  display: flex;
+  gap: 6px;
+  padding: 4px 0 6px;
+}
+
+.dot {
+  height: 4px;
+  flex: 1;
+  border-radius: 999px;
+  background: var(--surface-3);
+}
+
+.dot-on {
+  background: var(--accent);
+}
+
+.how-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  counter-reset: how;
+}
+
+.how-list li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.how-list strong {
+  display: block;
+  font-size: 15px;
+  margin-bottom: 3px;
+}
+
+.how-num {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-text);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex: none;
+}
+
+.choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.choice {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  text-align: left;
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 13px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.choice-on {
+  border-color: var(--accent);
+}
+
+.choice strong {
+  display: block;
+  font-size: 15px;
+}
+
+.choice .muted {
+  display: block;
+  margin-top: 2px;
+}
+
+.choice-mark {
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  flex: none;
+  margin-top: 2px;
+}
+
+.choice-on .choice-mark {
+  border-color: var(--accent);
+  background: radial-gradient(circle, var(--accent) 0 45%, transparent 46%);
+}
+
+/* ----------------------------------------------------------- today hero */
+
+.hero {
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hero-sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.hero-lineup {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.hero-lineup li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14.5px;
+}
+
+.hero-lineup .muted {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-size: 13.5px;
+}
+
+.hero-done {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--hit);
+}
+
+/* -------------------------------------------------------- day checklist */
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.task {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border);
+  padding: 13px 0;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+}
+
+.task:first-child {
+  border-top: none;
+}
+
+.task-na {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.task-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.task-label {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.task-done .task-label {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.task-go {
+  color: var(--muted);
+  font-size: 18px;
+}
+
+.task-ring {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ring-track {
+  stroke: var(--surface-3);
+}
+
+.ring-fill {
+  stroke: var(--accent);
+}
+
+.task-ring-done {
+  background: var(--hit);
+  color: var(--surface);
+}
+
+.task-ring-off {
+  border: 2px dashed var(--border);
+}
+
+.inline-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px;
+  background: var(--surface-2);
+  border-radius: 10px;
+}
+
+/* --------------------------------------------------------- session tips */
+
+.tip {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 13px 14px;
+}
+
+.tip strong {
+  display: block;
+  font-size: 14.5px;
+  margin-bottom: 2px;
+}
+
+.exercise-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.exercise-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.exercise-status {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex: none;
+}
+
+.exercise-status-on {
+  background: var(--hit);
+  border-color: var(--hit);
+  color: var(--surface);
+}
+
+.exercise-collapsed {
+  padding: 12px 15px;
+}
+
+.tip .btn-small {
+  white-space: nowrap;
+  flex: none;
+}
