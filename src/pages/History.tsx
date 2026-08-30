@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useAppData } from "../store/store";
 import { deleteSession } from "../store/actions";
 import { completedSessions } from "../store/selectors";
 import { sessionVolume } from "../lib/strength";
 import { formatDuration, formatWeight } from "../lib/units";
 import type { WorkoutSession } from "../types";
+import Icon from "../components/Icon";
 
 export default function History() {
   const data = useAppData();
@@ -13,6 +15,9 @@ export default function History() {
 
   return (
     <div className="page">
+      <Link className="btn-link" to="/progress">
+        ‹ Progress
+      </Link>
       <header className="page-head">
         <h1>History</h1>
         <p className="muted">
@@ -61,7 +66,9 @@ function SessionCard({
             {formatWeight(Math.round(volume))} {session.unit} moved
           </span>
         </div>
-        <span className="chevron">{open ? "▾" : "▸"}</span>
+        <span className={`chevron ${open ? "chevron-open" : ""}`}>
+          <Icon name="chevron" size={16} />
+        </span>
       </button>
 
       {open && (

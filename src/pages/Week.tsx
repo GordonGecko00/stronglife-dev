@@ -6,6 +6,7 @@ import { weekPlan, summarizeWeek, type DayPlan } from "../store/planning";
 import { habitProgress } from "../store/selectors";
 import { addDays, DAY_NAMES_SHORT, dayKey } from "../lib/misc";
 import { kindLabel } from "../lib/labels";
+import Icon from "../components/Icon";
 
 export default function Week() {
   const data = useAppData();
@@ -26,7 +27,7 @@ export default function Week() {
         <h1>The week</h1>
         <div className="week-nav">
           <button className="icon-btn" onClick={() => setOffsetWeeks((v) => v - 1)} aria-label="Previous week">
-            ‹
+            <Icon name="chevron" size={16} className="flip" />
           </button>
           <span className="muted">
             {offsetWeeks === 0
@@ -34,7 +35,7 @@ export default function Week() {
               : `${plans[0].date.toLocaleDateString(undefined, { month: "short", day: "numeric" })} – ${plans[6].date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`}
           </span>
           <button className="icon-btn" onClick={() => setOffsetWeeks((v) => v + 1)} aria-label="Next week">
-            ›
+            <Icon name="chevron" size={16} />
           </button>
         </div>
       </header>
@@ -60,8 +61,8 @@ export default function Week() {
 
       {collisions > 0 && (
         <div className="banner banner-warn">
-          <span className="banner-icon" aria-hidden="true">
-            ⚠️
+          <span className="banner-icon">
+            <Icon name="alert" />
           </span>
           <div>
             <strong>

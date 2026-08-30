@@ -19,6 +19,7 @@ import PlateChips from "../components/PlateChips";
 import { formatDuration, formatWeight } from "../lib/units";
 import { hitAllTargets } from "../lib/strength";
 import type { ExerciseLog } from "../types";
+import Icon from "../components/Icon";
 
 const SET_TIP = "set-logging";
 
@@ -232,7 +233,9 @@ function ExerciseCard({
           </span>
           {!open && <span className="muted">{summaryOf(log, unit)}</span>}
         </div>
-        <span className="chevron">{open ? "▾" : "▸"}</span>
+        <span className={`chevron ${open ? "chevron-open" : ""}`}>
+          <Icon name="chevron" size={16} />
+        </span>
       </button>
 
       {open && (

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useAppData } from "../store/store";
 import { programMonth } from "../store/selectors";
+import Icon from "../components/Icon";
 
 const LINKS = [
   { to: "/guide", label: "How it works", hint: "The flow in one screen" },
@@ -28,7 +29,9 @@ export default function More() {
               {link.label}
               <span className="muted row-hint">{link.hint}</span>
             </span>
-            <span className="muted">›</span>
+            <span className="task-go">
+              <Icon name="chevron" size={16} />
+            </span>
           </Link>
         ))}
       </div>

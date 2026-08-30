@@ -1,15 +1,18 @@
 import { useState } from "react";
 import { useAppData } from "../store/store";
+import { Link } from "react-router-dom";
 import {
   bodyWeightSeries,
+  completedSessions,
   exerciseProgress,
   knownExercises,
   personalRecords,
   stats,
+  workoutDayKeys,
 } from "../store/selectors";
 import LineChart from "../components/LineChart";
 import CalendarStrip from "../components/CalendarStrip";
-import { workoutDayKeys } from "../store/selectors";
+import { sessionVolume } from "../lib/strength";
 import { formatShortDate } from "../lib/misc";
 import { formatWeight } from "../lib/units";
 
@@ -28,6 +31,8 @@ export default function Progress() {
   const records = personalRecords(data, unit);
   const summary = stats(data, unit);
   const bodyWeight = bodyWeightSeries(data, unit);
+  const finished = completedSessions(data);
+  const recent = finished.slice(0, 4);
 
   return (
     <div className="page">
@@ -110,6 +115,39 @@ export default function Progress() {
                     est. 1RM {formatWeight(Math.round(record.oneRepMax))} {unit}
                   </span>
                 </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="card-head">
+          <h2>Recent sessions</h2>
+          {recent.length > 0 && (
+            <Link className="muted" to="/history">
+              All {finished.length} ›
+            </Link>
+          )}
+        </div>
+        {recent.length === 0 ? (
+          <p className="muted">Finish a session and it'll show up here.</p>
+        ) : (
+          <ul className="lineup">
+            {recent.map((session) => (
+              <li key={session.id}>
+                <span className="lineup-name">{session.templateName}</span>
+                <span className="lineup-detail">
+                  {formatShortDate(session.finishedAt ?? session.dateISO)}
+                  {sessionVolume(session.exercises) > 0 && (
+                    <>
+                      {" · "}
+                      <strong>
+                        {formatWeight(Math.round(sessionVolume(session.exercises)))} {session.unit}
+                      </strong>
+                    </>
+                  )}
+                </span>
               </li>
             ))}
           </ul>

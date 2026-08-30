@@ -20,6 +20,10 @@ Built around a six-day split with an evening sport in the mix: it knows that a
    opened from the day list.
 4. **Sunday, look at Week.** What's planned, what moved, and why.
 
+Four tabs: **Today** (do and log), **Week** (the plan), **Progress** (charts,
+records, recent sessions and the full history), **More** (program, milestones,
+settings).
+
 First launch walks through a 30-second setup (units, body weight, which nights
 you play, what to do the morning after). More → How it works explains the flow
 in one screen and can re-run setup.

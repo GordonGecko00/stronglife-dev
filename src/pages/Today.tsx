@@ -18,6 +18,7 @@ import { dayLog, habitProgress, proteinTarget } from "../store/selectors";
 import { DAY_NAMES_LONG, dayKey } from "../lib/misc";
 import { formatWeight } from "../lib/units";
 import { repRange } from "../lib/labels";
+import Icon from "../components/Icon";
 import type { WorkoutTemplate } from "../types";
 
 export default function Today() {
@@ -85,8 +86,8 @@ export default function Today() {
 
       {plan.reason && (
         <div className="banner">
-          <span className="banner-icon" aria-hidden="true">
-            🌙
+          <span className="banner-icon">
+            <Icon name="moon" />
           </span>
           <div>
             <strong>{plan.reason}</strong>
@@ -123,7 +124,10 @@ export default function Today() {
             {up.action}
           </button>
         ) : (
-          <p className="hero-done">✓ Nothing left today</p>
+          <p className="hero-done">
+            <Icon name="check" size={20} />
+            Nothing left today
+          </p>
         )}
 
         {up.kind === "session" && plan.status === "adjusted" && plan.scheduled && (
@@ -165,8 +169,8 @@ export default function Today() {
                 <span className="muted">{task.detail}</span>
               </span>
               {task.state !== "na" && task.state !== "done" && (
-                <span className="task-go" aria-hidden="true">
-                  ›
+                <span className="task-go">
+                  <Icon name="chevron" size={16} />
                 </span>
               )}
             </button>
@@ -186,8 +190,8 @@ export default function Today() {
 function TaskRing({ task }: { task: DayTask }) {
   if (task.state === "done") {
     return (
-      <span className="task-ring task-ring-done" aria-hidden="true">
-        ✓
+      <span className="task-ring task-ring-done">
+        <Icon name="check" size={15} />
       </span>
     );
   }
@@ -200,17 +204,19 @@ function TaskRing({ task }: { task: DayTask }) {
   return (
     <svg className="task-ring" width={size} height={size} aria-hidden="true">
       <circle cx={size / 2} cy={size / 2} r={r} className="ring-track" fill="none" strokeWidth={3} />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={r}
-        className="ring-fill"
-        fill="none"
-        strokeWidth={3}
-        strokeDasharray={`${c * task.progress} ${c}`}
-        strokeLinecap="round"
-        transform={`rotate(-90 ${size / 2} ${size / 2})`}
-      />
+      {task.progress > 0 && (
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          className="ring-fill"
+          fill="none"
+          strokeWidth={3}
+          strokeDasharray={`${c * task.progress} ${c}`}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      )}
     </svg>
   );
 }
@@ -240,7 +246,10 @@ function CheckInDetail({ onClose }: { onClose: () => void }) {
 
       <div className="meter">
             <div className="meter-head">
-              <span>Protein</span>
+              <span className="label-icon">
+                <Icon name="flame" size={16} />
+                Protein
+              </span>
               <span className="meter-value">
                 {log.proteinGrams}
                 {target ? ` / ${target} g` : " g"}
@@ -267,7 +276,10 @@ function CheckInDetail({ onClose }: { onClose: () => void }) {
 
           <div className="meter">
             <div className="meter-head">
-              <span>Water</span>
+              <span className="label-icon">
+                <Icon name="drop" size={16} />
+                Water
+              </span>
               <span className="meter-value">
                 {log.waterGlasses} / {data.settings.waterTarget}
               </span>
@@ -297,8 +309,8 @@ function CheckInDetail({ onClose }: { onClose: () => void }) {
                 aria-pressed={doneToday}
                 onClick={() => toggleHabit(key, habit.id)}
               >
-                <span className="habit-check" aria-hidden="true">
-                  {doneToday ? "✓" : ""}
+                <span className="habit-check">
+                  <Icon name="check" size={12} />
                 </span>
                 <span className="habit-name">{habit.name}</span>
                 <span className="habit-count">
@@ -413,22 +425,28 @@ function OtherSessions({ onPick }: { onPick: (t: WorkoutTemplate) => void }) {
   const data = useAppData();
   const [open, setOpen] = useState(false);
 
+  if (!open) {
+    return (
+      <button className="quiet-link" onClick={() => setOpen(true)}>
+        Start a different session
+      </button>
+    );
+  }
+
   return (
     <div className="card">
-      <button className="card-toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-        <div>
-          <h2>Do something else</h2>
-          <span className="muted">Start any session off-schedule</span>
-        </div>
-        <span className="chevron">{open ? "▾" : "▸"}</span>
-      </button>
-      {open &&
-        data.templates.map((template) => (
-          <button key={template.id} className="row-button" onClick={() => onPick(template)}>
-            <span>{template.name}</span>
-            <span className={`kind-tag kind-${template.kind}`}>{template.kind}</span>
-          </button>
-        ))}
+      <div className="card-head">
+        <h2>Start a different session</h2>
+        <button className="btn-link" onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+      </div>
+      {data.templates.map((template) => (
+        <button key={template.id} className="row-button" onClick={() => onPick(template)}>
+          <span>{template.name}</span>
+          <span className={`kind-tag kind-${template.kind}`}>{template.kind}</span>
+        </button>
+      ))}
     </div>
   );
 }
