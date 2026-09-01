@@ -11,6 +11,7 @@ import Settings from "./pages/Settings";
 import Milestones from "./pages/Milestones";
 import More from "./pages/More";
 import Session from "./pages/Session";
+import Day from "./pages/Day";
 import Onboarding from "./pages/Onboarding";
 import Guide from "./pages/Guide";
 import { useAppData } from "./store/store";
@@ -58,6 +59,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/" element={<Today />} />
           <Route path="/week" element={<Week />} />
+          <Route path="/day/:key" element={<Day />} />
           <Route path="/program" element={<Program />} />
           <Route path="/progress" element={<Progress />} />
           <Route path="/history" element={<History />} />

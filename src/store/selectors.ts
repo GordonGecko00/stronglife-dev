@@ -1,7 +1,15 @@
-import type { AppData, DailyLog, Habit, Unit, WorkoutSession, WorkoutTemplate } from "../types";
+import type {
+  AppData,
+  BodyWeightEntry,
+  DailyLog,
+  Habit,
+  Unit,
+  WorkoutSession,
+  WorkoutTemplate,
+} from "../types";
 import { estimateOneRepMax, sessionVolume } from "../lib/strength";
 import { convert } from "../lib/units";
-import { addDays, dayKey, exerciseKey, startOfDay } from "../lib/misc";
+import { addDays, dayKey, endOfDay, exerciseKey, startOfDay } from "../lib/misc";
 
 export function completedSessions(d: AppData): WorkoutSession[] {
   return d.sessions.filter((s) => s.finishedAt !== null);
@@ -198,23 +206,37 @@ export function dayLog(d: AppData, key: string): DailyLog {
   return d.dailyLogs[key] ?? { dayKey: key, proteinGrams: 0, waterGlasses: 0, habits: {}, journal: "" };
 }
 
+/** The body weight entry logged on a given day, if there is one. */
+export function bodyWeightOn(d: AppData, key: string): BodyWeightEntry | null {
+  return d.bodyWeights.find((entry) => dayKey(entry.dateISO) === key) ?? null;
+}
+
 /**
- * Daily protein goal from the most recent body weight, converted into the
- * current unit. Returns null until a body weight has been logged.
+ * Daily protein goal from body weight, converted into the current unit.
+ * Returns null until a body weight has been logged.
+ *
+ * `on` picks the weight you were at then rather than the weight you are now, so
+ * reviewing a day from six weeks ago shows the target you were actually eating
+ * against. Days before your first weigh-in fall back to that first entry, since
+ * a target that reads "—" is less useful than an approximate one.
  */
-export function proteinTarget(d: AppData): number | null {
-  const latest = d.bodyWeights[0];
-  if (!latest) return null;
-  const weight = convert(latest.weight, latest.unit, d.settings.unit);
+export function proteinTarget(d: AppData, on?: Date): number | null {
+  if (d.bodyWeights.length === 0) return null;
+  const cutoff = on ? endOfDay(on).getTime() : Infinity;
+  const entry =
+    d.bodyWeights.find((e) => Date.parse(e.dateISO) <= cutoff) ??
+    d.bodyWeights[d.bodyWeights.length - 1];
+  const weight = convert(entry.weight, entry.unit, d.settings.unit);
   return Math.round(weight * d.settings.proteinPerUnit);
 }
 
 export interface HabitProgress {
   habit: Habit;
-  /** Days completed within the current week. */
+  /** Days completed within the week containing the reference day. */
   count: number;
   target: number;
-  doneToday: boolean;
+  /** Ticked on the reference day itself, which need not be today. */
+  doneOnDay: boolean;
 }
 
 /** Habit completion for the Monday-to-Sunday week containing `from`. */
@@ -222,7 +244,7 @@ export function habitProgress(d: AppData, from = new Date()): HabitProgress[] {
   const monday = startOfDay(from);
   monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
   const weekKeys = Array.from({ length: 7 }, (_, i) => dayKey(addDays(monday, i)));
-  const todayKey = dayKey(from);
+  const key = dayKey(from);
 
   return d.habits
     .filter((h) => !h.archived)
@@ -230,7 +252,7 @@ export function habitProgress(d: AppData, from = new Date()): HabitProgress[] {
       habit,
       count: weekKeys.filter((key) => d.dailyLogs[key]?.habits[habit.id]).length,
       target: habit.cadence === "daily" ? 7 : habit.weeklyTarget,
-      doneToday: Boolean(d.dailyLogs[todayKey]?.habits[habit.id]),
+      doneOnDay: Boolean(d.dailyLogs[key]?.habits[habit.id]),
     }));
 }
 

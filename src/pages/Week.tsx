@@ -78,6 +78,8 @@ export default function Week() {
         </div>
       )}
 
+      <p className="muted list-hint">Tap a date to open that day and edit anything on it.</p>
+
       <div className="day-list">
         {plans.map((plan) => (
           <DayCard
@@ -92,6 +94,7 @@ export default function Week() {
             }}
             onLogGame={() => setLogging(plan)}
             onEdit={(id) => navigate(`/session/${id}`)}
+            onOpenDay={() => navigate(`/day/${plan.key}`)}
           />
         ))}
       </div>
@@ -134,12 +137,14 @@ function DayCard({
   onStart,
   onLogGame,
   onEdit,
+  onOpenDay,
 }: {
   plan: DayPlan;
   isToday: boolean;
   onStart: (templateId: string) => void;
   onLogGame: () => void;
   onEdit: (sessionId: string) => void;
+  onOpenDay: () => void;
 }) {
   const done = plan.logged.length > 0;
   const past = plan.date < new Date() && !isToday;
@@ -148,10 +153,19 @@ function DayCard({
 
   return (
     <div className={`day-card ${isToday ? "day-card-today" : ""} ${past && !done ? "day-card-past" : ""}`}>
-      <div className="day-card-date">
+      <button
+        className="day-card-date"
+        onClick={onOpenDay}
+        aria-label={`Open ${plan.date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}`}
+      >
         <span className="day-card-name">{DAY_NAMES_SHORT[plan.date.getDay()]}</span>
-        <span className="day-card-num">{plan.date.getDate()}</span>
-      </div>
+        <span className="day-card-num">
+          {plan.date.getDate()}
+          <span className="day-card-open" aria-hidden="true">
+            <Icon name="chevron" size={13} />
+          </span>
+        </span>
+      </button>
 
       <div className="day-card-body">
         {plan.morning ? (

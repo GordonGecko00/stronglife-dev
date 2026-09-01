@@ -12,7 +12,7 @@ import type {
   WorkoutTemplate,
 } from "../types";
 import { update } from "./store";
-import { uid, vibrate } from "../lib/misc";
+import { dayKey, uid, vibrate } from "../lib/misc";
 import { applyProgression } from "../lib/strength";
 import { warmupSets } from "../lib/warmup";
 import { convertRounded, DEFAULT_BAR, DEFAULT_PLATES } from "../lib/units";
@@ -468,15 +468,25 @@ export function setRotationIndex(index: number): void {
 
 /* ------------------------------------------------------------ body weight */
 
-export function logBodyWeight(weight: number): void {
+/**
+ * Record body weight for a day, replacing whatever was there.
+ *
+ * One weight per day, and the list is kept newest-first: everything that reads
+ * a "current" weight — the protein target, the trend chart — takes the front of
+ * this list, so a weight filled in for last Tuesday must not land there.
+ */
+export function logBodyWeight(weight: number, when: Date = new Date()): void {
   update((d) => {
+    const key = dayKey(when);
     const entry: BodyWeightEntry = {
       id: uid(),
-      dateISO: new Date().toISOString(),
+      dateISO: when.toISOString(),
       weight,
       unit: d.settings.unit,
     };
-    d.bodyWeights.unshift(entry);
+    d.bodyWeights = d.bodyWeights.filter((b) => dayKey(b.dateISO) !== key);
+    d.bodyWeights.push(entry);
+    d.bodyWeights.sort((a, b) => Date.parse(b.dateISO) - Date.parse(a.dateISO));
   });
 }
 

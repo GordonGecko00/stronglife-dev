@@ -109,6 +109,12 @@ function SessionCard({
             <Link className="btn btn-small btn-ghost" to={`/session/${session.id}`}>
               Edit
             </Link>
+            <Link
+              className="btn btn-small btn-ghost"
+              to={`/day/${dayKey(session.finishedAt ?? session.dateISO)}`}
+            >
+              Open day
+            </Link>
             <button
               className="btn-link danger"
               onClick={() => {

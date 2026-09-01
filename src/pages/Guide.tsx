@@ -81,6 +81,22 @@ export default function Guide() {
 
       <div className="card">
         <div className="card-head">
+          <h2>Fixing a day you got wrong</h2>
+        </div>
+        <p className="muted">
+          Tap any date in <strong>Week</strong> to open that day on its own. Everything on it can
+          be changed after the fact: the workout and its reps, a game you forgot to log or logged
+          on the wrong night, protein and water, habits, the journal, and your body weight for
+          that day.
+        </p>
+        <p className="muted">
+          Correcting history doesn't move your working weights — those live in More → Program, so
+          a typo from three weeks ago can't reshuffle tomorrow's lift.
+        </p>
+      </div>
+
+      <div className="card">
+        <div className="card-head">
           <h2>Hockey</h2>
         </div>
         <p className="muted">

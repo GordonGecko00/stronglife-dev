@@ -30,12 +30,12 @@ export interface CheckInProgress {
 export function checkInProgress(d: AppData, date = new Date()): CheckInProgress {
   const key = dayKey(date);
   const log = dayLog(d, key);
-  const target = proteinTarget(d);
+  const target = proteinTarget(d, date);
   const daily = habitProgress(d, date).filter((h) => h.habit.cadence === "daily");
 
   const proteinDone = target !== null && log.proteinGrams >= target;
   const waterDone = log.waterGlasses >= d.settings.waterTarget;
-  const habitsDone = daily.filter((h) => h.doneToday).length;
+  const habitsDone = daily.filter((h) => h.doneOnDay).length;
 
   return {
     proteinDone,

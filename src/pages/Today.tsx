@@ -5,20 +5,15 @@ import {
   getActiveSession,
   startSession,
   cancelSession,
-  logBodyWeight,
   logSessionJustFinished,
-  bumpWater,
-  bumpProtein,
-  patchDailyLog,
-  toggleHabit,
 } from "../store/actions";
 import { planForDate } from "../store/planning";
-import { dayTasks, nextUp, checkInProgress, greeting, type DayTask } from "../store/day";
-import { dayLog, habitProgress, proteinTarget } from "../store/selectors";
-import { DAY_NAMES_LONG, dayKey } from "../lib/misc";
+import { dayTasks, nextUp, greeting, type DayTask } from "../store/day";
+import { DAY_NAMES_LONG } from "../lib/misc";
 import { formatWeight } from "../lib/units";
 import { repRange } from "../lib/labels";
 import Icon from "../components/Icon";
+import CheckIn from "../components/CheckIn";
 import LogGameSheet from "../components/LogGameSheet";
 import type { WorkoutTemplate } from "../types";
 
@@ -180,7 +175,7 @@ export default function Today() {
       </div>
 
       <div ref={checkInRef}>
-        {openCheckIn && <CheckInDetail onClose={() => setOpenCheckIn(false)} />}
+        {openCheckIn && <CheckIn date={today} onClose={() => setOpenCheckIn(false)} />}
       </div>
 
       <OtherSessions onPick={begin} />
@@ -227,206 +222,6 @@ function TaskRing({ task }: { task: DayTask }) {
         />
       )}
     </svg>
-  );
-}
-
-function CheckInDetail({ onClose }: { onClose: () => void }) {
-  const data = useAppData();
-  const key = dayKey(new Date());
-  const log = dayLog(data, key);
-  const target = proteinTarget(data);
-  const habits = habitProgress(data);
-  const progress = checkInProgress(data);
-  const [showJournal, setShowJournal] = useState(log.journal.length > 0);
-
-  return (
-    <div className="card">
-      <div className="card-head">
-        <div>
-          <h2>Daily check-in</h2>
-          <span className="muted">
-            {progress.completed} of {progress.total} done
-          </span>
-        </div>
-        <button className="btn-link" onClick={onClose}>
-          Hide
-        </button>
-      </div>
-
-      <div className="meter">
-            <div className="meter-head">
-              <span className="label-icon">
-                <Icon name="flame" size={16} />
-                Protein
-              </span>
-              <span className="meter-value">
-                {log.proteinGrams}
-                {target ? ` / ${target} g` : " g"}
-              </span>
-            </div>
-            <div className="meter-track">
-              <div
-                className="meter-fill"
-                style={{ width: `${target ? Math.min(100, (log.proteinGrams / target) * 100) : 0}%` }}
-              />
-            </div>
-            <div className="chip-row">
-              {[20, 30, 40].map((grams) => (
-                <button key={grams} className="mini-btn" onClick={() => bumpProtein(key, grams)}>
-                  +{grams}
-                </button>
-              ))}
-              <button className="mini-btn" onClick={() => bumpProtein(key, -20)}>
-                −20
-              </button>
-            </div>
-            {!target && <BodyWeightPrompt />}
-          </div>
-
-          <div className="meter">
-            <div className="meter-head">
-              <span className="label-icon">
-                <Icon name="drop" size={16} />
-                Water
-              </span>
-              <span className="meter-value">
-                {log.waterGlasses} / {data.settings.waterTarget}
-              </span>
-            </div>
-            <div className="glass-row">
-              {Array.from({ length: data.settings.waterTarget }, (_, i) => (
-                <button
-                  key={i}
-                  className={`glass ${i < log.waterGlasses ? "glass-on" : ""}`}
-                  aria-label={`${i + 1} glasses`}
-                  onClick={() =>
-                    patchDailyLog(key, { waterGlasses: i + 1 === log.waterGlasses ? i : i + 1 })
-                  }
-                />
-              ))}
-              <button className="mini-btn" onClick={() => bumpWater(key, 1)}>
-                +1
-              </button>
-            </div>
-          </div>
-
-          <div className="habit-list">
-            {habits.map(({ habit, count, target: habitTarget, doneToday }) => (
-              <button
-                key={habit.id}
-                className={`habit ${doneToday ? "habit-on" : ""}`}
-                aria-pressed={doneToday}
-                onClick={() => toggleHabit(key, habit.id)}
-              >
-                <span className="habit-check">
-                  <Icon name="check" size={12} />
-                </span>
-                <span className="habit-name">{habit.name}</span>
-                <span className="habit-count">
-                  {habit.cadence === "weekly" ? `${count}/${habitTarget} wk` : ""}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          {showJournal ? (
-            <label className="field">
-              <span>Journal</span>
-              <textarea
-                rows={3}
-                value={log.journal}
-                placeholder="Gratitude, reflections, intentions for tomorrow…"
-                onChange={(event) => patchDailyLog(key, { journal: event.target.value })}
-              />
-            </label>
-          ) : (
-            <button className="btn-link" onClick={() => setShowJournal(true)}>
-              + Journal entry
-            </button>
-          )}
-
-      <BodyWeightRow />
-    </div>
-  );
-}
-
-/** Shown inline where the missing protein target is felt, not in a far-away card. */
-function BodyWeightPrompt() {
-  const data = useAppData();
-  const [value, setValue] = useState("");
-
-  return (
-    <form
-      className="inline-prompt"
-      onSubmit={(event) => {
-        event.preventDefault();
-        const parsed = Number(value);
-        if (!Number.isFinite(parsed) || parsed <= 0) return;
-        logBodyWeight(parsed);
-        setValue("");
-      }}
-    >
-      <span className="muted">Add your body weight to get a protein target:</span>
-      <div className="inline-form">
-        <input
-          type="number"
-          inputMode="decimal"
-          step="0.1"
-          placeholder={data.settings.unit === "lb" ? "180" : "82"}
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          aria-label="Body weight"
-        />
-        <button className="btn btn-small btn-ghost" type="submit">
-          Set
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function BodyWeightRow() {
-  const data = useAppData();
-  const [value, setValue] = useState("");
-  const latest = data.bodyWeights[0];
-  const loggedToday = latest && dayKey(latest.dateISO) === dayKey(new Date());
-
-  if (!latest) return null;
-
-  return (
-    <form
-      className="field"
-      onSubmit={(event) => {
-        event.preventDefault();
-        const parsed = Number(value);
-        if (!Number.isFinite(parsed) || parsed <= 0) return;
-        logBodyWeight(parsed);
-        setValue("");
-      }}
-    >
-      <span>
-        Body weight{" "}
-        {loggedToday ? (
-          <>· {formatWeight(latest.weight)} {latest.unit} today</>
-        ) : (
-          <>· last {formatWeight(latest.weight)} {latest.unit}</>
-        )}
-      </span>
-      <div className="inline-form">
-        <input
-          type="number"
-          inputMode="decimal"
-          step="0.1"
-          placeholder="Today's weight"
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          aria-label="Body weight"
-        />
-        <button className="btn btn-small btn-ghost" type="submit">
-          Log
-        </button>
-      </div>
-    </form>
   );
 }
 
