@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAppData } from "../store/store";
 import {
   getActiveSession,
@@ -12,12 +12,15 @@ import {
   setSessionNote,
   finishSession,
   cancelSession,
+  deleteSession,
+  setSessionStart,
   dismissTip,
 } from "../store/actions";
 import SetCell from "../components/SetCell";
 import PlateChips from "../components/PlateChips";
 import { formatDuration, formatWeight } from "../lib/units";
 import { hitAllTargets } from "../lib/strength";
+import { dayKey } from "../lib/misc";
 import type { ExerciseLog } from "../types";
 import Icon from "../components/Icon";
 
@@ -26,7 +29,16 @@ const SET_TIP = "set-logging";
 export default function Session() {
   const data = useAppData();
   const navigate = useNavigate();
-  const session = getActiveSession(data);
+  const { sessionId } = useParams();
+
+  // Without an id this is the workout in progress; with one it is a past
+  // session opened for correction. Same screen either way — the controls that
+  // matter are identical, only the framing around them changes.
+  const session = sessionId
+    ? data.sessions.find((s) => s.id === sessionId) ?? null
+    : getActiveSession(data);
+  const editing = session !== null && session.finishedAt !== null;
+
   const [elapsed, setElapsed] = useState(0);
   // Which exercise card is expanded, tracked alongside the session it belongs
   // to. It opens on the first unfinished exercise and then stays under the
@@ -38,20 +50,20 @@ export default function Session() {
   });
 
   useEffect(() => {
-    if (!session) return;
+    if (!session || editing) return;
     const tick = () => setElapsed(Math.floor((Date.now() - session.startedAt) / 1000));
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [session]);
+  }, [session, editing]);
 
   // Finishing clears the active session, which would otherwise trip the guard
   // below and bounce us to Today instead of the history we just wrote.
   const leaving = useRef(false);
 
   useEffect(() => {
-    if (!session && !leaving.current) navigate("/", { replace: true });
-  }, [session, navigate]);
+    if (!session && !leaving.current) navigate(sessionId ? "/history" : "/", { replace: true });
+  }, [session, sessionId, navigate]);
 
   if (!session) return null;
 
@@ -59,7 +71,9 @@ export default function Session() {
   // effect, so there is no second render pass.
   let openIndex = openCard.index;
   if (openCard.sessionId !== session.id) {
-    const first = session.exercises.findIndex((ex) => !logDone(ex));
+    // Training: jump to the next thing to do. Reviewing: start at the top,
+    // since a finished session has no "next" and you read it in order.
+    const first = editing ? 0 : session.exercises.findIndex((ex) => !logDone(ex));
     openIndex = first === -1 ? Math.max(0, session.exercises.length - 1) : first;
     setOpenCard({ sessionId: session.id, index: openIndex });
   }
@@ -76,21 +90,38 @@ export default function Session() {
     <div className="page session-page">
       <header className="session-head">
         <div>
-          <p className="eyebrow">{formatDuration(elapsed)} elapsed</p>
+          <p className="eyebrow">
+            {editing
+              ? new Date(session.startedAt).toLocaleDateString(undefined, {
+                  weekday: "long",
+                  month: "short",
+                  day: "numeric",
+                })
+              : `${formatDuration(elapsed)} elapsed`}
+          </p>
           <h1>{session.templateName}</h1>
         </div>
         <button
           className="btn btn-small btn-ghost danger"
           onClick={() => {
+            if (editing) {
+              if (!confirm("Delete this session from your history?")) return;
+              leaving.current = true;
+              deleteSession(session.id);
+              navigate("/history", { replace: true });
+              return;
+            }
             if (confirm("Discard this workout? Nothing will be saved.")) {
               cancelSession(session.id);
               navigate("/");
             }
           }}
         >
-          Discard
+          {editing ? "Delete" : "Discard"}
         </button>
       </header>
+
+      {editing && <SessionWhen session={session} />}
 
       <div className="progress-track" aria-hidden="true">
         <div
@@ -159,18 +190,56 @@ export default function Session() {
         />
       </label>
 
-      <button
-        className="btn btn-primary"
-        disabled={loggedCount === 0}
-        onClick={() => {
-          if (!allLogged && !confirm("Some sets aren't logged. Finish anyway?")) return;
-          leaving.current = true;
-          finishSession(session.id);
-          navigate("/history", { replace: true });
-        }}
-      >
-        Finish workout
-      </button>
+      {editing ? (
+        <>
+          <p className="muted">
+            Changes save as you make them. Editing history doesn't move your current working
+            weights — those live in More → Program.
+          </p>
+          <button className="btn btn-primary" onClick={() => navigate(-1)}>
+            Done
+          </button>
+        </>
+      ) : (
+        <button
+          className="btn btn-primary"
+          disabled={loggedCount === 0}
+          onClick={() => {
+            if (!allLogged && !confirm("Some sets aren't logged. Finish anyway?")) return;
+            leaving.current = true;
+            finishSession(session.id);
+            navigate("/history", { replace: true });
+          }}
+        >
+          Finish workout
+        </button>
+      )}
+    </div>
+  );
+}
+
+function SessionWhen({ session }: { session: { id: string; startedAt: number } }) {
+  const day = dayKey(session.startedAt);
+  const start = new Date(session.startedAt);
+  const time = `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`;
+
+  function move(nextDay: string, nextTime: string) {
+    const moved = new Date(`${nextDay}T${nextTime}`);
+    if (!Number.isNaN(moved.getTime())) setSessionStart(session.id, moved);
+  }
+
+  return (
+    <div className="card">
+      <div className="field-grid">
+        <label>
+          Day
+          <input type="date" value={day} onChange={(event) => move(event.target.value, time)} />
+        </label>
+        <label>
+          Start time
+          <input type="time" value={time} onChange={(event) => move(day, event.target.value)} />
+        </label>
+      </div>
     </div>
   );
 }

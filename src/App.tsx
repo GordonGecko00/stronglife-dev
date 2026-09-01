@@ -68,6 +68,7 @@ export default function App() {
         </Route>
         <Route element={<Layout withNav={false} />}>
           <Route path="/session" element={<Session />} />
+          <Route path="/session/:sessionId" element={<Session />} />
           <Route path="/welcome" element={<Onboarding />} />
         </Route>
       </Routes>

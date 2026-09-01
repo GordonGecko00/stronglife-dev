@@ -142,6 +142,10 @@ export function setReps(
     set.reps = reps;
     set.done = reps !== null;
 
+    // Only the workout actually in progress drives the rest timer; correcting
+    // a past session should not start one.
+    if (d.activeSessionId !== sessionId) return;
+
     if (reps === null) {
       d.restEndsAt = null;
       return;
@@ -241,6 +245,45 @@ export function finishSession(sessionId: string): void {
       d.schedule.rotationIndex = (d.schedule.rotationIndex + 1) % d.schedule.rotation.length;
     }
   });
+}
+
+/** Move a logged session to a different day or time, keeping its duration. */
+export function setSessionStart(sessionId: string, startedAt: Date): void {
+  update((d) => {
+    const session = withSession(d, sessionId);
+    if (!session) return;
+    const duration =
+      session.finishedAt !== null ? session.finishedAt - session.startedAt : 0;
+    session.startedAt = startedAt.getTime();
+    session.dateISO = startedAt.toISOString();
+    if (session.finishedAt !== null) session.finishedAt = startedAt.getTime() + duration;
+  });
+}
+
+/**
+ * Add a session you forgot to log, already finished but with nothing filled in,
+ * so it can be corrected on the edit screen.
+ */
+export function addPastSession(template: WorkoutTemplate, startedAt: Date): string {
+  const id = uid();
+  update((d) => {
+    d.sessions.unshift({
+      id,
+      templateId: template.id,
+      templateName: template.name,
+      kind: template.kind,
+      dateISO: startedAt.toISOString(),
+      startedAt: startedAt.getTime(),
+      // Zero-length until the sets are filled in; the editor can adjust it.
+      finishedAt: startedAt.getTime(),
+      unit: d.settings.unit,
+      note: "",
+      effort: null,
+      exercises: template.exercises.map((e) => buildExerciseLog(e, d.settings)),
+    });
+    d.sessions.sort((a, b) => (b.finishedAt ?? 0) - (a.finishedAt ?? 0));
+  });
+  return id;
 }
 
 export function cancelSession(sessionId: string): void {

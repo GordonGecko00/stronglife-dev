@@ -91,6 +91,7 @@ export default function Week() {
               navigate("/session");
             }}
             onLogGame={() => setLogging(plan)}
+            onEdit={(id) => navigate(`/session/${id}`)}
           />
         ))}
       </div>
@@ -132,11 +133,13 @@ function DayCard({
   isToday,
   onStart,
   onLogGame,
+  onEdit,
 }: {
   plan: DayPlan;
   isToday: boolean;
   onStart: (templateId: string) => void;
   onLogGame: () => void;
+  onEdit: (sessionId: string) => void;
 }) {
   const done = plan.logged.length > 0;
   const past = plan.date < new Date() && !isToday;
@@ -201,9 +204,14 @@ function DayCard({
         {plan.logged.length > 0 && (
           <div className="logged-row">
             {plan.logged.map((session) => (
-              <span key={session.id} className="badge badge-hit">
+              <button
+                key={session.id}
+                className="badge badge-hit badge-button"
+                onClick={() => onEdit(session.id)}
+                aria-label={`Edit ${session.templateName}`}
+              >
                 ✓ {session.templateName}
-              </span>
+              </button>
             ))}
           </div>
         )}

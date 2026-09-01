@@ -2033,3 +2033,16 @@ p {
     transform: translateY(14px);
   }
 }
+
+/* A logged session chip doubles as the way into editing it. */
+.badge-button {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
