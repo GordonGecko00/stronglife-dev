@@ -596,6 +596,10 @@ export interface OnboardingChoices {
  * the user's week rather than a generic default.
  */
 export function completeOnboarding(choices: OnboardingChoices): void {
+  // A program carried over from an older version may have no sport session to
+  // hang the chosen nights on; make one first so the picks actually stick.
+  if (choices.sportDays.length > 0) ensureSportTemplate("Hockey", choices.sportMinutes || 90);
+
   update((d) => {
     if (choices.unit !== d.settings.unit) {
       const from = d.settings.unit;
@@ -639,6 +643,49 @@ export function completeOnboarding(choices: OnboardingChoices): void {
     d.programStartISO = new Date().toISOString();
     d.onboardedAt = new Date().toISOString();
   });
+}
+
+/**
+ * Find the sport session, creating one if the program has none.
+ *
+ * Anyone upgrading from an earlier version keeps their own workouts, so the
+ * seeded Hockey session never reaches them — without this, picking sport nights
+ * silently does nothing because there is no template to point the schedule at.
+ */
+export function ensureSportTemplate(name = "Hockey", minutes = 90): string {
+  let id = "";
+  update((d) => {
+    const existing = d.templates.find((t) => t.kind === "sport");
+    if (existing) {
+      id = existing.id;
+      return;
+    }
+    id = uid();
+    d.templates.push({
+      id,
+      name,
+      kind: "sport",
+      slot: "pm",
+      exercises: [
+        {
+          id: uid(),
+          name: "Ice Time",
+          tracking: "duration",
+          sets: 1,
+          targetReps: 1,
+          targetRepsMax: 1,
+          weight: 0,
+          increment: 0,
+          consecutiveFails: 0,
+          usesBar: false,
+          useWarmup: false,
+          targetMinutes: minutes,
+          hint: "",
+        },
+      ],
+    });
+  });
+  return id;
 }
 
 export function restartOnboarding(): void {

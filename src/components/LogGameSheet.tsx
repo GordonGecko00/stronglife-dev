@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useAppData } from "../store/store";
-import { logSession } from "../store/actions";
+import { getData, useAppData } from "../store/store";
+import { ensureSportTemplate, logSession } from "../store/actions";
 import { dayKey } from "../lib/misc";
 import type { WorkoutTemplate } from "../types";
 
@@ -28,11 +28,14 @@ export default function LogGameSheet({
 }) {
   const data = useAppData();
 
-  const candidates = data.templates.filter((t) => t.kind === "sport");
-  const options = candidates.length > 0 ? candidates : data.templates;
+  const options = data.templates.filter((t) => t.kind === "sport");
+  // With no sport session in the program there is nothing sensible to log
+  // against — offer to create one rather than filing a game under a lifting day.
+  const needsTemplate = options.length === 0;
   const initial = template ?? options[0] ?? null;
 
   const [templateId, setTemplateId] = useState(initial?.id ?? "");
+  const [newName, setNewName] = useState("Hockey");
   const [day, setDay] = useState(dayKey(date));
   // Default to an hour that trips the late-night rule, since that's the case
   // this exists for.
@@ -43,17 +46,26 @@ export default function LogGameSheet({
   });
   const chosen = data.templates.find((t) => t.id === templateId) ?? initial;
   const [minutes, setMinutes] = useState(
-    String(chosen?.exercises.find((e) => e.tracking === "duration")?.targetMinutes || 60)
+    String(chosen?.exercises.find((e) => e.tracking === "duration")?.targetMinutes || 90)
   );
 
   const parsedMinutes = Math.max(1, Number(minutes) || 60);
   const startedAt = new Date(`${day}T${time}`);
-  const valid = chosen !== null && !Number.isNaN(startedAt.getTime());
+  const validTime = !Number.isNaN(startedAt.getTime());
+  const valid = validTime && (needsTemplate ? newName.trim().length > 0 : chosen !== null);
   const late = valid && startedAt.getHours() >= data.settings.recovery.lateHour;
 
   function save() {
-    if (!chosen || !valid) return;
-    logSession(chosen, { minutes: parsedMinutes, startedAt });
+    if (!valid) return;
+
+    let target: WorkoutTemplate | null = chosen;
+    if (needsTemplate) {
+      const id = ensureSportTemplate(newName.trim(), parsedMinutes);
+      target = getData().templates.find((t) => t.id === id) ?? null;
+    }
+    if (!target) return;
+
+    logSession(target, { minutes: parsedMinutes, startedAt });
     onClose();
   }
 
@@ -73,6 +85,20 @@ export default function LogGameSheet({
             Cancel
           </button>
         </div>
+
+        {needsTemplate && (
+          <label className="field">
+            <span>What do you play?</span>
+            <input
+              value={newName}
+              placeholder="Hockey"
+              onChange={(event) => setNewName(event.target.value)}
+            />
+            <span className="muted">
+              Saved as a session you can put on your schedule later.
+            </span>
+          </label>
+        )}
 
         {options.length > 1 && (
           <label className="field">
