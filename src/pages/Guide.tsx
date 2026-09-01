@@ -81,6 +81,22 @@ export default function Guide() {
 
       <div className="card">
         <div className="card-head">
+          <h2>Hockey</h2>
+        </div>
+        <p className="muted">
+          <strong>Regular nights</strong> go on More → Program → Weekly schedule, in the
+          <em> Evening</em> column. Those are what the week plans around.
+        </p>
+        <p className="muted">
+          <strong>To record a game</strong> — including a pickup game on a night you don't
+          normally play, or one you forgot to log — tap the evening row on Today, or the
+          <em> Log</em> button on any past day in Week. Set the time you played: it decides whether
+          the next morning gets eased off.
+        </p>
+      </div>
+
+      <div className="card">
+        <div className="card-head">
           <h2>The late-night rule</h2>
         </div>
         <p className="muted">

@@ -193,3 +193,78 @@ describe("week plan", () => {
     expect(summary.adjustments).toBe(3);
   });
 });
+
+describe("logging a game after the fact", () => {
+  /** Mirrors what LogGameSheet does: a game recorded with a real start time. */
+  function logAt(data: AppData, template: WorkoutTemplate, date: Date, hour: number, minutes: number) {
+    const start = new Date(date);
+    start.setHours(hour, 0, 0, 0);
+    data.sessions.unshift({
+      id: `logged-${start.getTime()}`,
+      templateId: template.id,
+      templateName: template.name,
+      kind: template.kind,
+      dateISO: start.toISOString(),
+      startedAt: start.getTime(),
+      finishedAt: start.getTime() + minutes * 60_000,
+      unit: "lb",
+      note: "",
+      effort: null,
+      exercises: [],
+    });
+  }
+
+  it("eases off the next morning even though it was logged late", () => {
+    const { data, byName } = setup();
+    // A pickup game on a night with nothing scheduled.
+    data.schedule.eveningDays = { 0: null, 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
+    const wednesday = dateForWeekday(3);
+    const tuesday = new Date(wednesday);
+    tuesday.setDate(tuesday.getDate() - 1);
+
+    // Without the game, Wednesday is a normal strength morning.
+    expect(planForDate(data, wednesday).status).toBe("planned");
+
+    logAt(data, byName("Hockey"), tuesday, 21, 90);
+
+    const plan = planForDate(data, wednesday);
+    expect(plan.status).toBe("adjusted");
+    expect(plan.morning?.name).toBe("Active Recovery");
+  });
+
+  it("leaves the morning alone for an afternoon game", () => {
+    const { data, byName } = setup();
+    data.schedule.eveningDays = { 0: null, 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
+    const wednesday = dateForWeekday(3);
+    const tuesday = new Date(wednesday);
+    tuesday.setDate(tuesday.getDate() - 1);
+
+    logAt(data, byName("Hockey"), tuesday, 13, 90);
+
+    expect(planForDate(data, wednesday).status).toBe("planned");
+  });
+
+  it("attributes the game to the day it was played on", () => {
+    const { data, byName } = setup();
+    const wednesday = dateForWeekday(3);
+    const tuesday = new Date(wednesday);
+    tuesday.setDate(tuesday.getDate() - 1);
+
+    logAt(data, byName("Hockey"), tuesday, 21, 90);
+
+    expect(planForDate(data, tuesday).logged).toHaveLength(1);
+    expect(planForDate(data, wednesday).logged).toHaveLength(0);
+  });
+
+  it("a game logged at midnight would NOT read as late — the sheet asks for a time for this reason", () => {
+    const { data, byName } = setup();
+    data.schedule.eveningDays = { 0: null, 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
+    const wednesday = dateForWeekday(3);
+    const tuesday = new Date(wednesday);
+    tuesday.setDate(tuesday.getDate() - 1);
+
+    logAt(data, byName("Hockey"), tuesday, 0, 90);
+
+    expect(planForDate(data, wednesday).status).toBe("planned");
+  });
+});

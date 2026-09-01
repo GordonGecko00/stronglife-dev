@@ -80,8 +80,19 @@ export function startSession(template: WorkoutTemplate): string {
   return id;
 }
 
-/** Log a finished session in one go, for things like hockey you don't run a timer for. */
-export function quickLogSession(template: WorkoutTemplate, minutes: number, when = new Date()): void {
+/**
+ * Record a finished session in one go, for things like hockey you don't run a
+ * timer through.
+ *
+ * `startedAt` matters beyond bookkeeping: the late-night rule reads the clock
+ * time off the session to decide whether the next morning should be eased off,
+ * so a game logged after the fact has to carry the hour it was actually played.
+ */
+export function logSession(
+  template: WorkoutTemplate,
+  options: { minutes: number; startedAt: Date; note?: string }
+): void {
+  const { minutes, startedAt, note = "" } = options;
   update((d) => {
     const exercises = template.exercises.map((e) => {
       const log = buildExerciseLog(e, d.settings);
@@ -94,15 +105,20 @@ export function quickLogSession(template: WorkoutTemplate, minutes: number, when
       templateId: template.id,
       templateName: template.name,
       kind: template.kind,
-      dateISO: when.toISOString(),
-      startedAt: when.getTime() - minutes * 60_000,
-      finishedAt: when.getTime(),
+      dateISO: startedAt.toISOString(),
+      startedAt: startedAt.getTime(),
+      finishedAt: startedAt.getTime() + minutes * 60_000,
       unit: d.settings.unit,
-      note: "",
+      note,
       effort: null,
       exercises,
     });
   });
+}
+
+/** Log a session that just finished. */
+export function logSessionJustFinished(template: WorkoutTemplate, minutes: number): void {
+  logSession(template, { minutes, startedAt: new Date(Date.now() - minutes * 60_000) });
 }
 
 export function getActiveSession(d: AppData): WorkoutSession | null {

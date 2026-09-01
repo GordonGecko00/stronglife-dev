@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAppData } from "../store/store";
-import { startSession, quickLogSession } from "../store/actions";
+import { startSession } from "../store/actions";
 import { weekPlan, summarizeWeek, type DayPlan } from "../store/planning";
 import { habitProgress } from "../store/selectors";
 import { addDays, DAY_NAMES_SHORT, dayKey } from "../lib/misc";
 import { kindLabel } from "../lib/labels";
 import Icon from "../components/Icon";
+import LogGameSheet from "../components/LogGameSheet";
 
 export default function Week() {
   const data = useAppData();
   const navigate = useNavigate();
   const [offsetWeeks, setOffsetWeeks] = useState(0);
+  const [logging, setLogging] = useState<DayPlan | null>(null);
 
   const anchor = addDays(new Date(), offsetWeeks * 7);
   const plans = weekPlan(data, anchor);
@@ -88,10 +90,7 @@ export default function Week() {
               startSession(template);
               navigate("/session");
             }}
-            onQuickLog={(templateId, minutes) => {
-              const template = data.templates.find((t) => t.id === templateId);
-              if (template) quickLogSession(template, minutes, plan.date);
-            }}
+            onLogGame={() => setLogging(plan)}
           />
         ))}
       </div>
@@ -116,6 +115,14 @@ export default function Week() {
           ))}
         </div>
       </div>
+
+      {logging && (
+        <LogGameSheet
+          date={logging.date}
+          template={logging.evening}
+          onClose={() => setLogging(null)}
+        />
+      )}
     </div>
   );
 }
@@ -124,15 +131,17 @@ function DayCard({
   plan,
   isToday,
   onStart,
-  onQuickLog,
+  onLogGame,
 }: {
   plan: DayPlan;
   isToday: boolean;
   onStart: (templateId: string) => void;
-  onQuickLog: (templateId: string, minutes: number) => void;
+  onLogGame: () => void;
 }) {
   const done = plan.logged.length > 0;
   const past = plan.date < new Date() && !isToday;
+  const future = !isToday && plan.date > new Date();
+  const sportLogged = plan.logged.some((s) => s.kind === "sport");
 
   return (
     <div className={`day-card ${isToday ? "day-card-today" : ""} ${past && !done ? "day-card-past" : ""}`}>
@@ -175,15 +184,18 @@ function DayCard({
               <span className="slot-name">{plan.evening.name}</span>
               <span className="muted">Evening</span>
             </div>
-            {isToday && (
-              <button
-                className="btn btn-small btn-ghost"
-                onClick={() => onQuickLog(plan.evening!.id, plan.evening!.exercises[0]?.targetMinutes || 60)}
-              >
+            {!future && !sportLogged && (
+              <button className="btn btn-small btn-ghost" onClick={onLogGame}>
                 Log
               </button>
             )}
           </div>
+        )}
+
+        {!plan.evening && !future && !sportLogged && (
+          <button className="quiet-link day-card-add" onClick={onLogGame}>
+            + Log a game
+          </button>
         )}
 
         {plan.logged.length > 0 && (

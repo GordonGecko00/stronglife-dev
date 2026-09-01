@@ -13,6 +13,8 @@ export interface DayTask {
   state: TaskState;
   /** 0–1, for the ring. */
   progress: number;
+  /** Whether tapping the row does anything. */
+  actionable: boolean;
 }
 
 export interface CheckInProgress {
@@ -69,14 +71,21 @@ export function dayTasks(d: AppData, date = new Date()): DayTask[] {
     detail: plan.morning ? plan.morning.name : "Rest day",
     state: plan.morning ? (trainingDone ? "done" : "todo") : trainingDone ? "done" : "na",
     progress: trainingDone ? 1 : 0,
+    actionable: Boolean(plan.morning) && !trainingDone,
   });
 
+  // Always tappable: a pickup game on an off night still needs somewhere to go.
   tasks.push({
     id: "sport",
     label: plan.evening ? plan.evening.name : "Evening",
-    detail: plan.evening ? "Log it after you play" : "Nothing on",
+    detail: sportDone
+      ? "Logged"
+      : plan.evening
+        ? "Log it after you play"
+        : "Nothing scheduled — log a game",
     state: plan.evening ? (sportDone ? "done" : "todo") : sportDone ? "done" : "na",
     progress: sportDone ? 1 : 0,
+    actionable: true,
   });
 
   tasks.push({
@@ -86,6 +95,7 @@ export function dayTasks(d: AppData, date = new Date()): DayTask[] {
     state:
       check.completed === 0 ? "todo" : check.completed >= check.total ? "done" : "partial",
     progress: check.total ? check.completed / check.total : 0,
+    actionable: true,
   });
 
   return tasks;

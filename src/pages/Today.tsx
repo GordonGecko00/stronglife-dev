@@ -6,7 +6,7 @@ import {
   startSession,
   cancelSession,
   logBodyWeight,
-  quickLogSession,
+  logSessionJustFinished,
   bumpWater,
   bumpProtein,
   patchDailyLog,
@@ -19,6 +19,7 @@ import { DAY_NAMES_LONG, dayKey } from "../lib/misc";
 import { formatWeight } from "../lib/units";
 import { repRange } from "../lib/labels";
 import Icon from "../components/Icon";
+import LogGameSheet from "../components/LogGameSheet";
 import type { WorkoutTemplate } from "../types";
 
 export default function Today() {
@@ -27,6 +28,7 @@ export default function Today() {
   const [searchParams] = useSearchParams();
   const checkInRef = useRef<HTMLDivElement>(null);
   const [openCheckIn, setOpenCheckIn] = useState(false);
+  const [loggingGame, setLoggingGame] = useState(false);
 
   const today = new Date();
   const active = getActiveSession(data);
@@ -54,8 +56,7 @@ export default function Today() {
     if (up.kind === "resume") return navigate("/session");
     if (up.kind === "session" && up.template) return begin(up.template);
     if (up.kind === "sport" && up.template) {
-      const minutes = up.template.exercises[0]?.targetMinutes || 60;
-      quickLogSession(up.template, minutes);
+      logSessionJustFinished(up.template, up.template.exercises[0]?.targetMinutes || 60);
       return;
     }
     if (up.kind === "checkin") {
@@ -70,8 +71,8 @@ export default function Today() {
       checkInRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     } else if (task.id === "session" && plan.morning) {
       begin(plan.morning);
-    } else if (task.id === "sport" && plan.evening) {
-      quickLogSession(plan.evening, plan.evening.exercises[0]?.targetMinutes || 60);
+    } else if (task.id === "sport") {
+      setLoggingGame(true);
     }
   }
 
@@ -160,7 +161,7 @@ export default function Today() {
             <button
               key={task.id}
               className={`task task-${task.state}`}
-              disabled={task.state === "na"}
+              disabled={!task.actionable}
               onClick={() => focusTask(task)}
             >
               <TaskRing task={task} />
@@ -168,7 +169,7 @@ export default function Today() {
                 <span className="task-label">{task.label}</span>
                 <span className="muted">{task.detail}</span>
               </span>
-              {task.state !== "na" && task.state !== "done" && (
+              {task.actionable && task.state !== "done" && (
                 <span className="task-go">
                   <Icon name="chevron" size={16} />
                 </span>
@@ -183,6 +184,14 @@ export default function Today() {
       </div>
 
       <OtherSessions onPick={begin} />
+
+      {loggingGame && (
+        <LogGameSheet
+          date={today}
+          template={plan.evening}
+          onClose={() => setLoggingGame(false)}
+        />
+      )}
     </div>
   );
 }
